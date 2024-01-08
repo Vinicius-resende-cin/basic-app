@@ -1,40 +1,49 @@
 import { Probot } from "probot";
 import { exec } from "child_process";
-
-function execute(command: string, callback: Function) {
-  exec(command, function (_error, stdout, _stderr) {
-    callback(stdout);
-  });
-}
+import fs from "fs";
+import util from "util";
+const pexec = util.promisify(exec);
 
 export = (app: Probot) => {
   app.on("pull_request.opened", async (context) => {
-    const owner = context.payload.repository.owner.login;
-    const repo = context.payload.repository.name;
-    const prNumber = context.payload.number;
+    const { owner, repo, pull_number } = context.pullRequest();
 
-    execute(
-      `D: && cd D:/Arquivos/Documentos/IC/Repositorios/ferramentas de analise/conflict-static-analysis && mvn exec:java -D"exec.mainClass"="br.unb.cic.analysis.Main" -D"exec.args"="-csv target/annotations.csv -cp target/test-classes"`,
-      async (output: string) => {
-        console.log(output);
-        const conflictsLine = output.match(/Number of conflicts:\s*([\d\.]*)\s*\n/);
-        const nConflicts = conflictsLine ? conflictsLine[1] : "[ERROR]";
-        const runtimeLine = output.match(/Total time:\s*([\d\.]*) s/);
-        const runtime = runtimeLine ? runtimeLine[1] : "[ERROR]";
+    let merge_commit = (await context.octokit.pulls.get({ owner, repo, pull_number })).data.merge_commit_sha;
+    for (let i = 0; !merge_commit && i < 5; i++) {
+      console.log("Waiting for merge commit...");
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      merge_commit = (await context.octokit.pulls.get({ owner, repo, pull_number })).data.merge_commit_sha;
+    }
 
-        const commentBody = `# Static Analysis Results
-### Number of conflicts: ${nConflicts}
-### Runtime: ${runtime} s`;
+    if (!merge_commit) throw new Error("No merge commit sha");
+    console.log(merge_commit);
 
-        await context.octokit.pulls.createReview({
-          owner,
-          repo,
-          pull_number: prNumber,
-          body: commentBody,
-          comments: [],
-          event: "COMMENT"
-        });
-      }
-    );
+    const { parents } = (await context.octokit.repos.getCommit({ owner, repo, ref: merge_commit })).data;
+    const left = parents[0].sha;
+    const right = parents[1].sha;
+    console.log(left, right);
+
+    if (fs.existsSync(repo)) fs.rmSync(repo, { recursive: true, force: true });
+
+    await pexec(`git clone https://github.com/${owner}/${repo}`);
+    process.chdir(repo);
+    const { stdout: merge_base } = await pexec(`git merge-base ${left} ${right}`);
+    console.log(merge_base);
+
+    process.chdir("..");
+    fs.rm(repo, { recursive: true, force: true }, (err) => {
+      if (err) throw err;
+    });
+
+    await context.octokit.pulls.createReview({
+      owner,
+      repo,
+      pull_number: pull_number,
+      body: `Merge commit (não presente na árvore de commits): ${merge_commit}
+Parents: ${left} ${right}
+Merge base: ${merge_base}`,
+      comments: [],
+      event: "COMMENT"
+    });
   });
 };
