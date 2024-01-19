@@ -35,8 +35,18 @@ export = (app: Probot) => {
     process.chdir(repo);
 
     // Get the merge base of the parents
-    const { stdout: merge_base } = await pexec(`git merge-base ${left} ${right}`);
+    let { stdout: merge_base } = await pexec(`git merge-base ${left} ${right}`);
+    merge_base = merge_base.trim();
     console.log(merge_base);
+
+    // Call the static-semantic-merge tool
+    const { stdout: analysis_output, stderr: analysis_error } = await pexec(
+      `java -jar ../static-semantic-merge/dependencies/static-semantic-merge-1.0-SNAPSHOT.jar ${merge_commit} ${left} ${right} ${merge_base} ../static-semantic-merge/dependencies C:/Gradle/gradle-5.1.1/bin D:/apache-maven-3.9.5/bin`
+    );
+
+    // Log the output and error
+    console.log(analysis_output);
+    console.log(analysis_error);
 
     // Go back to the original directory and delete the cloned repository
     process.chdir("..");
