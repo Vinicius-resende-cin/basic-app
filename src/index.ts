@@ -39,14 +39,30 @@ export = (app: Probot) => {
     merge_base = merge_base.trim();
     console.log(merge_base);
 
-    // Call the static-semantic-merge tool
-    const { stdout: analysis_output, stderr: analysis_error } = await pexec(
-      `java -jar ../static-semantic-merge/dependencies/static-semantic-merge-1.0-SNAPSHOT.jar ${merge_commit} ${left} ${right} ${merge_base} ../static-semantic-merge/dependencies C:/Gradle/gradle-5.1.1/bin D:/apache-maven-3.9.5/bin`
-    );
+    // Create a real merge commit on the local repository
+    await pexec(`git checkout ${left}`);
+    await pexec(`git merge ${right}`);
+    merge_commit = (await pexec(`git rev-parse HEAD`)).stdout.trim();
 
-    // Log the output and error
-    console.log(analysis_output);
-    console.log(analysis_error);
+    // Call the static-semantic-merge tool
+    const mergerPath = "D:/Arquivos/Documentos/IC/Repositorios/static-semantic-merge/dependencies";
+    const staticSemanticMergePath = `${mergerPath}/static-semantic-merge-1.0-SNAPSHOT.jar`;
+    const gradlePath = "C:/Gradle/gradle-5.1.1/bin";
+    const mavenPath = "D:/apache-maven-3.9.5/bin";
+
+    console.log("Running static-semantic-merge...");
+
+    try {
+      const { stdout: analysis_output, stderr: analysis_error } = await pexec(
+        `java -jar ${staticSemanticMergePath} ${merge_commit} ${left} ${right} ${merge_base} ${mergerPath} ${gradlePath} ${mavenPath}`
+      );
+
+      // Log the output and error
+      console.log(analysis_output);
+      console.log(analysis_error);
+    } catch (error) {
+      console.log(error);
+    }
 
     // Go back to the original directory and delete the cloned repository
     process.chdir("..");
