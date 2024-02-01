@@ -2,6 +2,7 @@ import { Probot } from "probot";
 import { exec } from "child_process";
 import fs from "fs";
 import util from "util";
+import "dotenv/config";
 const pexec = util.promisify(exec);
 
 // Initialize probot app
@@ -45,10 +46,10 @@ export = (app: Probot) => {
     merge_commit = (await pexec(`git rev-parse HEAD`)).stdout.trim();
 
     // Call the static-semantic-merge tool
-    const mergerPath = "D:/Arquivos/Documentos/IC/Repositorios/static-semantic-merge/dependencies";
-    const staticSemanticMergePath = `${mergerPath}/static-semantic-merge-1.0-SNAPSHOT.jar`;
-    const gradlePath = "C:/Gradle/gradle-5.1.1/bin";
-    const mavenPath = "D:/apache-maven-3.9.5/bin";
+    const mergerPath = process.env.MERGER_PATH;
+    const staticSemanticMergePath = process.env.STATIC_SEMANTIC_MERGE_PATH;
+    const gradlePath = process.env.GRADLE_PATH;
+    const mavenPath = process.env.MAVEN_PATH;
 
     console.log("Running static-semantic-merge...");
 
