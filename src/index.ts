@@ -51,12 +51,22 @@ export = (app: Probot) => {
     const gradlePath = process.env.GRADLE_PATH;
     const mavenPath = process.env.MAVEN_PATH;
 
+    const cmd = [
+      `java`,
+      `-jar ${staticSemanticMergePath}`,
+      `${merge_commit}`,
+      `${left}`,
+      `${right}`,
+      `${merge_base}`,
+      `${mergerPath}`,
+      `${gradlePath}`,
+      `${mavenPath}`
+    ];
+
     console.log("Running static-semantic-merge...");
 
     try {
-      const { stdout: analysis_output, stderr: analysis_error } = await pexec(
-        `java -jar ${staticSemanticMergePath} ${merge_commit} ${left} ${right} ${merge_base} ${mergerPath} ${gradlePath} ${mavenPath}`
-      );
+      const { stdout: analysis_output, stderr: analysis_error } = await pexec(cmd.join(" "));
 
       // Log the output and error
       console.log(analysis_output);
