@@ -75,6 +75,11 @@ export = (app: Probot) => {
       console.log(error);
     }
 
+    // Copy the outputs to the data directory
+    fs.mkdirSync(`../src/data/reports/${merge_commit}/`, { recursive: true });
+    fs.copyFileSync("out.txt", `../src/data/reports/${merge_commit}/out.txt`);
+    fs.copyFileSync("./data/soot-results.csv", `../src/data/reports/${merge_commit}/soot-results.csv`);
+
     // Go back to the original directory and delete the cloned repository
     process.chdir("..");
     fs.rm(repo, { recursive: true, force: true }, (err) => {
