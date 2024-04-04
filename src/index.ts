@@ -3,6 +3,7 @@ import { exec } from "child_process";
 import fs from "fs";
 import util from "util";
 import "dotenv/config";
+import { IAnalysisOutput } from "./models/AnalysisOutput";
 const pexec = util.promisify(exec);
 
 // Initialize probot app
@@ -101,5 +102,101 @@ Merge base: ${merge_base}`,
       comments: [],
       event: "COMMENT"
     });
+
+    /* Analysis output
+
+    Wanted Entry Name: samples/OverrideAssignmentVariable.class
+    Running left right NonCommutativeConflictDetectionAlgorithm{name = OA Intra}
+    Using jar at D:\Arquivos\Documentos\IC\Repositorios\basic-app\semantic-conflict\.\files\project\036dcd0b879708b62fc0b599e8b7614dbbbb10ee\original-without-dependencies\merge\build.jar
+    Soot started on Thu Apr 04 00:33:20 BRT 2024
+    Soot finished on Thu Apr 04 00:33:20 BRT 2024
+    Soot has run for 0 min. 0 sec.
+    Analysis results
+    ----------------------------
+    Number of conflicts: 1
+    Results exported to out.txt
+    ----------------------------
+    Running right left NonCommutativeConflictDetectionAlgorithm{name = OA Intra}
+    Using jar at D:\Arquivos\Documentos\IC\Repositorios\basic-app\semantic-conflict\.\files\project\036dcd0b879708b62fc0b599e8b7614dbbbb10ee\original-without-dependencies\merge\build.jar
+    Soot started on Thu Apr 04 00:33:20 BRT 2024
+    Soot finished on Thu Apr 04 00:33:21 BRT 2024
+    Soot has run for 0 min. 0 sec.
+    Analysis results
+    ----------------------------
+    Number of conflicts: 1
+    Results exported to out.txt
+    ----------------------------
+    Wanted Entry Name: samples/OverrideAssignmentVariable.class
+    Running left right NonCommutativeConflictDetectionAlgorithm{name = OA Inter}
+    Using jar at D:\Arquivos\Documentos\IC\Repositorios\basic-app\semantic-conflict\.\files\project\036dcd0b879708b62fc0b599e8b7614dbbbb10ee\original-without-dependencies\merge\build.jar
+    abr 04, 2024 12:33:22 AM br.unb.cic.analysis.ioa.InterproceduralOverrideAssignment internalTransform
+    INFORMA��ES: CONFLICTS: [source(samples.OverrideAssignmentVariable, conflict, 10, x = 2, [Stacktrace{sootClass=OverrideAssignmentVariable, sootMethod=void conflict(), lineNumber=10}]) => sink(samples.OverrideAssignmentVariable, conflict, 7, x = 0, [Stacktrace{sootClass=OverrideAssignmentVariable, sootMethod=void conflict(), lineNumber=7}])]
+    Runtime: 0.022s
+    Analysis results
+    ----------------------------
+    Number of conflicts: 1
+    Results exported to out.txt
+    ----------------------------
+    Running right left NonCommutativeConflictDetectionAlgorithm{name = OA Inter}
+    Using jar at D:\Arquivos\Documentos\IC\Repositorios\basic-app\semantic-conflict\.\files\project\036dcd0b879708b62fc0b599e8b7614dbbbb10ee\original-without-dependencies\merge\build.jar
+    abr 04, 2024 12:33:24 AM br.unb.cic.analysis.ioa.InterproceduralOverrideAssignment internalTransform
+    INFORMA��ES: CONFLICTS: [source(samples.OverrideAssignmentVariable, conflict, 10, x = 2, [Stacktrace{sootClass=OverrideAssignmentVariable, sootMethod=void conflict(), lineNumber=10}]) => sink(samples.OverrideAssignmentVariable, conflict, 7, x = 0, [Stacktrace{sootClass=OverrideAssignmentVariable, sootMethod=void conflict(), lineNumber=7}])]
+    Runtime: 0.023s
+    Analysis results
+    ----------------------------
+    Number of conflicts: 1
+    Results exported to out.txt
+    ----------------------------
+
+    */
+
+    // Send the analysis results to the analysis server
+    const analysisOutput: IAnalysisOutput = {
+      repository: repo,
+      owner: owner,
+      pull_number: pull_number,
+      results: [
+        {
+          analysis: {
+            confluenceIntra: "error",
+            confluenceInter: "error",
+            leftRightOAIntra: "true",
+            rightLeftOAIntra: "true",
+            leftRightOAInter: "true",
+            rightLeftOAInter: "true",
+            leftRightPdgSdg: "error",
+            rightLeftPdgSdg: "error",
+            leftRightDfpInter: "error",
+            rightLeftDfpInter: "error",
+            leftRightPdgSdge: "error",
+            rightLeftPdgSdge: "error"
+          },
+          dependencies: [
+            {
+              from: {
+                className: "samples.OverrideAssignmentVariable",
+                method: "conflict",
+                lineNumber: 9
+              },
+              to: {
+                className: "samples.OverrideAssignmentVariable",
+                method: "conflict",
+                lineNumber: 6
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    await fetch("http://localhost:4000/analysis", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ analysis: analysisOutput })
+    })
+      .then((res) => console.log(res.text()))
+      .catch((error) => console.log(error));
   });
 };
