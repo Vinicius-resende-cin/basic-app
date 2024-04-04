@@ -6,7 +6,7 @@ import "dotenv/config";
 const pexec = util.promisify(exec);
 
 // Initialize probot app
-export = (app: Probot) => {
+export default (app: Probot) => {
   // Receives a webhook event for every opened pull request
   app.on("pull_request.opened", async (context) => {
     // Get owner, repo and pull number from the context
@@ -76,9 +76,13 @@ export = (app: Probot) => {
     }
 
     // Copy the outputs to the data directory
-    fs.mkdirSync(`../src/data/reports/${merge_commit}/`, { recursive: true });
-    fs.copyFileSync("out.txt", `../src/data/reports/${merge_commit}/out.txt`);
-    fs.copyFileSync("./data/soot-results.csv", `../src/data/reports/${merge_commit}/soot-results.csv`);
+    try {
+      fs.mkdirSync(`../src/data/reports/${repo}/`, { recursive: true });
+      fs.copyFileSync("out.txt", `../src/data/reports/${repo}/out.txt`);
+      fs.copyFileSync("./data/soot-results.csv", `../src/data/reports/${repo}/soot-results.csv`);
+    } catch (error) {
+      console.log(error);
+    }
 
     // Go back to the original directory and delete the cloned repository
     process.chdir("..");
