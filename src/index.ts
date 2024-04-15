@@ -3,7 +3,7 @@ import { exec } from "child_process";
 import fs from "fs";
 import util from "util";
 import "dotenv/config";
-import { IAnalysisOutput } from "./models/AnalysisOutput";
+import { IAnalysisOutput, interferenceTypes } from "./models/AnalysisOutput";
 const pexec = util.promisify(exec);
 
 // Initialize probot app
@@ -51,6 +51,31 @@ export default (app: Probot) => {
     const staticSemanticMergePath = process.env.STATIC_SEMANTIC_MERGE_PATH;
     const gradlePath = process.env.GRADLE_PATH;
     const mavenPath = process.env.MAVEN_PATH;
+
+    /*
+      `java`,
+      `-jar ${staticSemanticMergePath}`,
+      `${merge_commit}`,
+      `${left}`,
+      `${right}`,
+      `${merge_base}`,
+      `${mergerPath}`,
+      `${gradlePath}`,
+      `${mavenPath}`
+    */
+
+    /*
+      `java`,
+      `--illegal-access=warn`,
+      `-jar ${staticSemanticMergePath}`,
+      `-h ${merge_commit}`,
+      `-p ${left} ${right}`,
+      `-b ${merge_base}`,
+      `-ssm ${mergerPath}`,
+      `-gp ${gradlePath}`,
+      `-mvp ${mavenPath}`,
+      `-mp ./`
+    */
 
     const cmd = [
       `java`,
@@ -152,39 +177,42 @@ Merge base: ${merge_base}`,
 
     // Send the analysis results to the analysis server
     const analysisOutput: IAnalysisOutput = {
+      uuid: "661579e387487aec69fb6a4a",
       repository: repo,
       owner: owner,
       pull_number: pull_number,
-      results: [
+      data: {},
+      events: [
         {
-          analysis: {
-            confluenceIntra: "error",
-            confluenceInter: "error",
-            leftRightOAIntra: "true",
-            rightLeftOAIntra: "true",
-            leftRightOAInter: "true",
-            rightLeftOAInter: "true",
-            leftRightPdgSdg: "error",
-            rightLeftPdgSdg: "error",
-            leftRightDfpInter: "error",
-            rightLeftDfpInter: "error",
-            leftRightPdgSdge: "error",
-            rightLeftPdgSdge: "error"
-          },
-          dependencies: [
-            {
-              from: {
-                className: "samples.OverrideAssignmentVariable",
-                method: "conflict",
-                lineNumber: 9
+          type: "leftRightOAIntra",
+          label: "at samples.OverrideAssignmentVariable.conflict(OverrideAssignmentVariable.java:9)",
+          body: {
+            description: "OA conflict",
+            interference: [
+              {
+                type: interferenceTypes.OA.DECLARATION,
+                branch: "L",
+                text: "int x = 1;",
+                location: {
+                  file: "src/main/java/samples/OverrideAssignmentVariable.java",
+                  class: "samples.OverrideAssignmentVariable",
+                  method: "conflict",
+                  line: 5
+                }
               },
-              to: {
-                className: "samples.OverrideAssignmentVariable",
-                method: "conflict",
-                lineNumber: 6
+              {
+                type: interferenceTypes.OA.OVERRIDE,
+                branch: "R",
+                text: "x = 2;",
+                location: {
+                  file: "src/main/java/samples/OverrideAssignmentVariable.java",
+                  class: "samples.OverrideAssignmentVariable",
+                  method: "conflict",
+                  line: 9
+                }
               }
-            }
-          ]
+            ]
+          }
         }
       ]
     };
