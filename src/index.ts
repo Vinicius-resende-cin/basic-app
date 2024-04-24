@@ -79,14 +79,15 @@ export default (app: Probot) => {
 
     const cmd = [
       `java`,
+      `--illegal-access=warn`,
       `-jar ${staticSemanticMergePath}`,
-      `${merge_commit}`,
-      `${left}`,
-      `${right}`,
-      `${merge_base}`,
-      `${mergerPath}`,
-      `${gradlePath}`,
-      `${mavenPath}`
+      `-h ${merge_commit}`,
+      `-p ${left} ${right}`,
+      `-b ${merge_base}`,
+      `-ssm ${mergerPath}`,
+      `-gp ${gradlePath}`,
+      `-mvp ${mavenPath}`,
+      `-mp ./`
     ];
 
     console.log("Running static-semantic-merge...");
