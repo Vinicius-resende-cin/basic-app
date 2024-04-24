@@ -1,8 +1,0 @@
-#!/bin/sh
-head=$(git rev-parse HEAD)
-parents=$(git log --pretty=%P -n 1 $head)
-base=$(git merge-base $parents)
-mergerPath="../static-semantic-merge/dependencies"
-gradlePath="C:/Gradle/gradle-5.1.1/bin"
-mavenPath="D:/apache-maven-3.9.5/bin"
-java -jar ${mergerPath}/static-semantic-merge-1.0-SNAPSHOT.jar $head $parents $base $mergerPath $gradlePath $mavenPath
