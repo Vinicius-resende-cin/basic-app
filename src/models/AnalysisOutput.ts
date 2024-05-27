@@ -11,9 +11,23 @@ type interferenceTypeList = {
   };
 };
 
+type eventTypes = {
+  OA: {
+    INTRA: {
+      LR: "leftRightOAIntra";
+      RL: "rightLeftOAIntra";
+    };
+    INTER: {
+      LR: "leftRightOAInter";
+      RL: "rightLeftOAInter";
+    };
+  };
+};
+
 type Flatten<T> = T extends object ? T[keyof T] : T;
 
 type interferenceType = Flatten<Flatten<interferenceTypeList>>;
+type eventType = Flatten<Flatten<Flatten<eventTypes>>>;
 
 const interferenceTypes: interferenceTypeList = {
   OA: {
@@ -23,6 +37,19 @@ const interferenceTypes: interferenceTypeList = {
   DEFAULT: {
     SOURCE: "source",
     SINK: "sink"
+  }
+};
+
+const eventTypes: eventTypes = {
+  OA: {
+    INTRA: {
+      LR: "leftRightOAIntra",
+      RL: "rightLeftOAIntra"
+    },
+    INTER: {
+      LR: "leftRightOAInter",
+      RL: "rightLeftOAInter"
+    }
   }
 };
 
@@ -52,7 +79,7 @@ interface IAnalysisOutput {
     [key: string]: any;
   };
   events: Array<{
-    type: string;
+    type: eventType;
     label: string;
     body: {
       description: string;
@@ -68,7 +95,7 @@ class AnalysisOutput implements IAnalysisOutput {
   uuid: string;
   data: { [key: string]: any };
   events: Array<{
-    type: string;
+    type: eventType;
     label: string;
     body: {
       description: string;
@@ -86,4 +113,4 @@ class AnalysisOutput implements IAnalysisOutput {
   }
 }
 
-export { IAnalysisOutput, AnalysisOutput, interferenceTypes };
+export { IAnalysisOutput, AnalysisOutput, interferenceTypes, eventTypes };
