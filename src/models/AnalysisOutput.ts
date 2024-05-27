@@ -11,7 +11,7 @@ type interferenceTypeList = {
   };
 };
 
-type eventTypes = {
+type eventTypeList = {
   OA: {
     INTRA: {
       LR: "leftRightOAIntra";
@@ -27,7 +27,7 @@ type eventTypes = {
 type Flatten<T> = T extends object ? T[keyof T] : T;
 
 type interferenceType = Flatten<Flatten<interferenceTypeList>>;
-type eventType = Flatten<Flatten<Flatten<eventTypes>>>;
+type eventType = Flatten<Flatten<Flatten<eventTypeList>>>;
 
 const interferenceTypes: interferenceTypeList = {
   OA: {
@@ -40,7 +40,7 @@ const interferenceTypes: interferenceTypeList = {
   }
 };
 
-const eventTypes: eventTypes = {
+const eventTypes: eventTypeList = {
   OA: {
     INTRA: {
       LR: "leftRightOAIntra",
@@ -70,6 +70,15 @@ type interferenceNode = {
   stackTrace?: Array<lineLocation>;
 };
 
+export type dependency = {
+  type: eventType;
+  label: string;
+  body: {
+    description: string;
+    interference: Array<interferenceNode>;
+  };
+};
+
 interface IAnalysisOutput {
   uuid: string;
   repository: string;
@@ -78,14 +87,7 @@ interface IAnalysisOutput {
   data: {
     [key: string]: any;
   };
-  events: Array<{
-    type: eventType;
-    label: string;
-    body: {
-      description: string;
-      interference: Array<interferenceNode>;
-    };
-  }>;
+  events: dependency[];
 }
 
 class AnalysisOutput implements IAnalysisOutput {
@@ -94,14 +96,7 @@ class AnalysisOutput implements IAnalysisOutput {
   pull_number: number;
   uuid: string;
   data: { [key: string]: any };
-  events: Array<{
-    type: eventType;
-    label: string;
-    body: {
-      description: string;
-      interference: Array<interferenceNode>;
-    };
-  }>;
+  events: dependency[];
 
   constructor(analysisOutput: IAnalysisOutput) {
     this.uuid = analysisOutput.uuid;
