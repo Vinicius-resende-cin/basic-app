@@ -46,6 +46,10 @@ export default (app: Probot) => {
     await pexec(`git merge ${right}`);
     merge_commit = (await pexec(`git rev-parse HEAD`)).stdout.trim();
 
+    // Execute the two-dott diff between the base commit and the merge commit
+    const { stdout: diff_output } = await pexec(`git diff ${merge_base} ${merge_commit}`);
+    console.log(diff_output);
+
     // Call the static-semantic-merge tool
     const mergerPath = process.env.MERGER_PATH;
     const staticSemanticMergePath = process.env.STATIC_SEMANTIC_MERGE_PATH;
