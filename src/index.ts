@@ -3,7 +3,7 @@ import { exec } from "child_process";
 import fs from "fs";
 import util from "util";
 import "dotenv/config";
-import { IAnalysisOutput, interferenceTypes } from "./models/AnalysisOutput";
+import { IAnalysisOutput, interferenceTypes, eventTypes } from "./models/AnalysisOutput";
 const pexec = util.promisify(exec);
 
 // Initialize probot app
@@ -51,6 +51,7 @@ export default (app: Probot) => {
     const staticSemanticMergePath = process.env.STATIC_SEMANTIC_MERGE_PATH;
     const gradlePath = process.env.GRADLE_PATH;
     const mavenPath = process.env.MAVEN_PATH;
+    const scriptsPath = process.env.SCRIPTS_PATH;
 
     /*
       `java`,
@@ -77,9 +78,24 @@ export default (app: Probot) => {
       `-mp ./`
     */
 
-    const cmd = [
+    /*
       `java`,
       `--illegal-access=warn`,
+      `-jar ${staticSemanticMergePath}`,
+      `-bc ${merge_base}`,
+      `-cn org.example.Main`,
+      `-gp ${gradlePath}`,
+      `-hc ${merge_commit}`,
+      `-m main`,
+      `-mp ${mavenPath}`,
+      `-pc ${left} ${right}`,
+      `-ssm ${mergerPath}`,
+      `-tpr ./`,
+      `-sp ${scriptsPath}`
+    */
+
+    /*
+      `java`,
       `-jar ${staticSemanticMergePath}`,
       `-h ${merge_commit}`,
       `-p ${left} ${right}`,
@@ -87,7 +103,21 @@ export default (app: Probot) => {
       `-ssm ${mergerPath}`,
       `-gp ${gradlePath}`,
       `-mvp ${mavenPath}`,
-      `-mp ./`
+      `-mp ./`,
+      `-sp ${scriptsPath}`
+      */
+
+    const cmd = [
+      `java`,
+      `-jar ${staticSemanticMergePath}`,
+      `-h ${merge_commit}`,
+      `-p ${left} ${right}`,
+      `-b ${merge_base}`,
+      `-ssm ${mergerPath}`,
+      `-gp ${gradlePath}`,
+      `-mvp ${mavenPath}`,
+      `-mp ./`,
+      `-sp ${scriptsPath}`
     ];
 
     console.log("Running static-semantic-merge...");
@@ -185,7 +215,7 @@ Merge base: ${merge_base}`,
       data: {},
       events: [
         {
-          type: "leftRightOAIntra",
+          type: eventTypes.OA.INTRA.LR,
           label: "at samples.OverrideAssignmentVariable.conflict(OverrideAssignmentVariable.java:9)",
           body: {
             description: "OA conflict",
