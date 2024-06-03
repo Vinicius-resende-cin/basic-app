@@ -57,60 +57,6 @@ export default (app: Probot) => {
     const mavenPath = process.env.MAVEN_PATH;
     const scriptsPath = process.env.SCRIPTS_PATH;
 
-    /*
-      `java`,
-      `-jar ${staticSemanticMergePath}`,
-      `${merge_commit}`,
-      `${left}`,
-      `${right}`,
-      `${merge_base}`,
-      `${mergerPath}`,
-      `${gradlePath}`,
-      `${mavenPath}`
-    */
-
-    /*
-      `java`,
-      `--illegal-access=warn`,
-      `-jar ${staticSemanticMergePath}`,
-      `-h ${merge_commit}`,
-      `-p ${left} ${right}`,
-      `-b ${merge_base}`,
-      `-ssm ${mergerPath}`,
-      `-gp ${gradlePath}`,
-      `-mvp ${mavenPath}`,
-      `-mp ./`
-    */
-
-    /*
-      `java`,
-      `--illegal-access=warn`,
-      `-jar ${staticSemanticMergePath}`,
-      `-bc ${merge_base}`,
-      `-cn org.example.Main`,
-      `-gp ${gradlePath}`,
-      `-hc ${merge_commit}`,
-      `-m main`,
-      `-mp ${mavenPath}`,
-      `-pc ${left} ${right}`,
-      `-ssm ${mergerPath}`,
-      `-tpr ./`,
-      `-sp ${scriptsPath}`
-    */
-
-    /*
-      `java`,
-      `-jar ${staticSemanticMergePath}`,
-      `-h ${merge_commit}`,
-      `-p ${left} ${right}`,
-      `-b ${merge_base}`,
-      `-ssm ${mergerPath}`,
-      `-gp ${gradlePath}`,
-      `-mvp ${mavenPath}`,
-      `-mp ./`,
-      `-sp ${scriptsPath}`
-      */
-
     const cmd = [
       `java`,
       `-jar ${staticSemanticMergePath}`,
@@ -162,53 +108,6 @@ Merge base: ${merge_base}`,
       comments: [],
       event: "COMMENT"
     });
-
-    /* Analysis output
-
-    Wanted Entry Name: samples/OverrideAssignmentVariable.class
-    Running left right NonCommutativeConflictDetectionAlgorithm{name = OA Intra}
-    Using jar at D:\Arquivos\Documentos\IC\Repositorios\basic-app\semantic-conflict\.\files\project\036dcd0b879708b62fc0b599e8b7614dbbbb10ee\original-without-dependencies\merge\build.jar
-    Soot started on Thu Apr 04 00:33:20 BRT 2024
-    Soot finished on Thu Apr 04 00:33:20 BRT 2024
-    Soot has run for 0 min. 0 sec.
-    Analysis results
-    ----------------------------
-    Number of conflicts: 1
-    Results exported to out.txt
-    ----------------------------
-    Running right left NonCommutativeConflictDetectionAlgorithm{name = OA Intra}
-    Using jar at D:\Arquivos\Documentos\IC\Repositorios\basic-app\semantic-conflict\.\files\project\036dcd0b879708b62fc0b599e8b7614dbbbb10ee\original-without-dependencies\merge\build.jar
-    Soot started on Thu Apr 04 00:33:20 BRT 2024
-    Soot finished on Thu Apr 04 00:33:21 BRT 2024
-    Soot has run for 0 min. 0 sec.
-    Analysis results
-    ----------------------------
-    Number of conflicts: 1
-    Results exported to out.txt
-    ----------------------------
-    Wanted Entry Name: samples/OverrideAssignmentVariable.class
-    Running left right NonCommutativeConflictDetectionAlgorithm{name = OA Inter}
-    Using jar at D:\Arquivos\Documentos\IC\Repositorios\basic-app\semantic-conflict\.\files\project\036dcd0b879708b62fc0b599e8b7614dbbbb10ee\original-without-dependencies\merge\build.jar
-    abr 04, 2024 12:33:22 AM br.unb.cic.analysis.ioa.InterproceduralOverrideAssignment internalTransform
-    INFORMA��ES: CONFLICTS: [source(samples.OverrideAssignmentVariable, conflict, 10, x = 2, [Stacktrace{sootClass=OverrideAssignmentVariable, sootMethod=void conflict(), lineNumber=10}]) => sink(samples.OverrideAssignmentVariable, conflict, 7, x = 0, [Stacktrace{sootClass=OverrideAssignmentVariable, sootMethod=void conflict(), lineNumber=7}])]
-    Runtime: 0.022s
-    Analysis results
-    ----------------------------
-    Number of conflicts: 1
-    Results exported to out.txt
-    ----------------------------
-    Running right left NonCommutativeConflictDetectionAlgorithm{name = OA Inter}
-    Using jar at D:\Arquivos\Documentos\IC\Repositorios\basic-app\semantic-conflict\.\files\project\036dcd0b879708b62fc0b599e8b7614dbbbb10ee\original-without-dependencies\merge\build.jar
-    abr 04, 2024 12:33:24 AM br.unb.cic.analysis.ioa.InterproceduralOverrideAssignment internalTransform
-    INFORMA��ES: CONFLICTS: [source(samples.OverrideAssignmentVariable, conflict, 10, x = 2, [Stacktrace{sootClass=OverrideAssignmentVariable, sootMethod=void conflict(), lineNumber=10}]) => sink(samples.OverrideAssignmentVariable, conflict, 7, x = 0, [Stacktrace{sootClass=OverrideAssignmentVariable, sootMethod=void conflict(), lineNumber=7}])]
-    Runtime: 0.023s
-    Analysis results
-    ----------------------------
-    Number of conflicts: 1
-    Results exported to out.txt
-    ----------------------------
-
-    */
 
     // Send the analysis results to the analysis server
     const analysisOutput: IAnalysisOutput = {
