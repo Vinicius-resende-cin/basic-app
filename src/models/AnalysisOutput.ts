@@ -87,6 +87,7 @@ interface IAnalysisOutput {
   data: {
     [key: string]: any;
   };
+  diff: string;
   events: dependency[];
 }
 
@@ -96,6 +97,7 @@ class AnalysisOutput implements IAnalysisOutput {
   pull_number: number;
   uuid: string;
   data: { [key: string]: any };
+  diff: string;
   events: dependency[];
 
   constructor(analysisOutput: IAnalysisOutput) {
@@ -104,6 +106,7 @@ class AnalysisOutput implements IAnalysisOutput {
     this.owner = analysisOutput.owner;
     this.pull_number = analysisOutput.pull_number;
     this.data = analysisOutput.data;
+    this.diff = analysisOutput.diff;
     this.events = analysisOutput.events;
   }
 }

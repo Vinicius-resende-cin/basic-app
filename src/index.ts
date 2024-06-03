@@ -116,6 +116,7 @@ Merge base: ${merge_base}`,
       owner: owner,
       pull_number: pull_number,
       data: {},
+      diff: diff_output,
       events: [
         {
           type: eventTypes.OA.INTRA.LR,
