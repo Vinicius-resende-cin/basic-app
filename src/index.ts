@@ -51,22 +51,38 @@ export default (app: Probot) => {
     console.log(diff_output);
 
     // Call the static-semantic-merge tool
-    const mergerPath = process.env.MERGER_PATH;
+    const dependenciesPath = process.env.MERGER_PATH;
     const staticSemanticMergePath = process.env.STATIC_SEMANTIC_MERGE_PATH;
     const gradlePath = process.env.GRADLE_PATH;
     const mavenPath = process.env.MAVEN_PATH;
     const scriptsPath = process.env.SCRIPTS_PATH;
 
+    // const cmd = [
+    //   `java`,
+    //   `-jar ${staticSemanticMergePath}`,
+    //   `-hc ${merge_commit}`,
+    //   `-pc ${left} ${right}`,
+    //   `-bc ${merge_base}`,
+    //   `-dp ${dependenciesPath}`,
+    //   `-tpr ./`,
+    //   `-cn org.example.Main`,
+    //   `-m main`,
+    //   `-gp ${gradlePath}`,
+    //   `-mp ${mavenPath}`,
+    //   `-sp ${scriptsPath}`
+    // ];
+
     const cmd = [
       `java`,
       `-jar ${staticSemanticMergePath}`,
-      `-h ${merge_commit}`,
-      `-p ${left} ${right}`,
-      `-b ${merge_base}`,
-      `-ssm ${mergerPath}`,
+      `-hc ${merge_commit}`,
+      `-pc ${left} ${right}`,
+      `-bc ${merge_base}`,
+      `-ssm ${dependenciesPath}`,
+      `-tpr ./`,
+      `-m org.example.Main`,
       `-gp ${gradlePath}`,
-      `-mvp ${mavenPath}`,
-      `-mp ./`,
+      `-mp ${mavenPath}`,
       `-sp ${scriptsPath}`
     ];
 
@@ -86,6 +102,7 @@ export default (app: Probot) => {
     try {
       fs.mkdirSync(`../src/data/reports/${repo}/`, { recursive: true });
       fs.copyFileSync("out.txt", `../src/data/reports/${repo}/out.txt`);
+      fs.copyFileSync("out.json", `../src/data/reports/${repo}/out.json`);
       fs.copyFileSync("./data/soot-results.csv", `../src/data/reports/${repo}/soot-results.csv`);
     } catch (error) {
       console.log(error);
