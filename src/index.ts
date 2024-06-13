@@ -3,7 +3,8 @@ import { exec } from "child_process";
 import fs from "fs";
 import util from "util";
 import "dotenv/config";
-import { IAnalysisOutput, interferenceTypes, eventTypes } from "./models/AnalysisOutput";
+import { v4 as uuidv4 } from "uuid";
+import { IAnalysisOutput, dependency } from "./models/AnalysisOutput";
 const pexec = util.promisify(exec);
 
 // Initialize probot app
@@ -47,8 +48,8 @@ export default (app: Probot) => {
     merge_commit = (await pexec(`git rev-parse HEAD`)).stdout.trim();
 
     // Execute the two-dott diff between the base commit and the merge commit
-    const { stdout: diff_output } = await pexec(`git diff ${merge_base} ${merge_commit}`);
-    console.log(diff_output);
+    const { stdout: diffOutput } = await pexec(`git diff ${merge_base} ${merge_commit}`);
+    console.log(diffOutput);
 
     // Call the static-semantic-merge tool
     const dependenciesPath = process.env.MERGER_PATH;
@@ -108,6 +109,9 @@ export default (app: Probot) => {
       console.log(error);
     }
 
+    // get the JSON output
+    const jsonOutput = JSON.parse(fs.readFileSync(`out.json`, "utf-8")) as dependency[];
+
     // Go back to the original directory and delete the cloned repository
     process.chdir("..");
     fs.rm(repo, { recursive: true, force: true }, (err) => {
@@ -128,45 +132,13 @@ Merge base: ${merge_base}`,
 
     // Send the analysis results to the analysis server
     const analysisOutput: IAnalysisOutput = {
-      uuid: "661579e387487aec69fb6a4a",
+      uuid: uuidv4(),
       repository: repo,
       owner: owner,
       pull_number: pull_number,
       data: {},
-      diff: diff_output,
-      events: [
-        {
-          type: eventTypes.OA.INTRA.LR,
-          label: "at samples.OverrideAssignmentVariable.conflict(OverrideAssignmentVariable.java:9)",
-          body: {
-            description: "OA conflict",
-            interference: [
-              {
-                type: interferenceTypes.OA.DECLARATION,
-                branch: "L",
-                text: "int x = 1;",
-                location: {
-                  file: "src/main/java/samples/OverrideAssignmentVariable.java",
-                  class: "samples.OverrideAssignmentVariable",
-                  method: "conflict",
-                  line: 5
-                }
-              },
-              {
-                type: interferenceTypes.OA.OVERRIDE,
-                branch: "R",
-                text: "x = 2;",
-                location: {
-                  file: "src/main/java/samples/OverrideAssignmentVariable.java",
-                  class: "samples.OverrideAssignmentVariable",
-                  method: "conflict",
-                  line: 9
-                }
-              }
-            ]
-          }
-        }
-      ]
+      diff: diffOutput,
+      events: jsonOutput
     };
 
     await fetch("http://localhost:4000/analysis", {
