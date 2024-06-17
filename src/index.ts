@@ -58,30 +58,16 @@ export default (app: Probot) => {
     const mavenPath = process.env.MAVEN_PATH;
     const scriptsPath = process.env.SCRIPTS_PATH;
 
-    // const cmd = [
-    //   `java`,
-    //   `-jar ${staticSemanticMergePath}`,
-    //   `-hc ${merge_commit}`,
-    //   `-pc ${left} ${right}`,
-    //   `-bc ${merge_base}`,
-    //   `-dp ${dependenciesPath}`,
-    //   `-tpr ./`,
-    //   `-cn org.example.Main`,
-    //   `-m main`,
-    //   `-gp ${gradlePath}`,
-    //   `-mp ${mavenPath}`,
-    //   `-sp ${scriptsPath}`
-    // ];
-
     const cmd = [
       `java`,
       `-jar ${staticSemanticMergePath}`,
       `-hc ${merge_commit}`,
       `-pc ${left} ${right}`,
       `-bc ${merge_base}`,
-      `-ssm ${dependenciesPath}`,
+      `-dp ${dependenciesPath}`,
       `-tpr ./`,
-      `-m org.example.Main`,
+      `-cn org.example.Main`,
+      `-m main`,
       `-gp ${gradlePath}`,
       `-mp ${mavenPath}`,
       `-sp ${scriptsPath}`
