@@ -11,9 +11,17 @@ type interferenceTypeList = {
   };
 };
 
+type eventTypeList = {
+  OA: {
+    INTRA: "OAINTRA";
+    INTER: "OAINTER";
+  };
+};
+
 type Flatten<T> = T extends object ? T[keyof T] : T;
 
 type interferenceType = Flatten<Flatten<interferenceTypeList>>;
+type eventType = Flatten<Flatten<Flatten<eventTypeList>>>;
 
 const interferenceTypes: interferenceTypeList = {
   OA: {
@@ -23,6 +31,13 @@ const interferenceTypes: interferenceTypeList = {
   DEFAULT: {
     SOURCE: "source",
     SINK: "sink"
+  }
+};
+
+const eventTypes: eventTypeList = {
+  OA: {
+    INTRA: "OAINTRA",
+    INTER: "OAINTER"
   }
 };
 
@@ -40,7 +55,16 @@ type interferenceNode = {
   branch: "L" | "R";
   text: string;
   location: lineLocation;
-  stackTrace?: Array<lineLocation>;
+  stackTrace?: Array<string>;
+};
+
+export type dependency = {
+  type: eventType;
+  label: string;
+  body: {
+    description: string;
+    interference: Array<interferenceNode>;
+  };
 };
 
 interface IAnalysisOutput {
@@ -51,14 +75,8 @@ interface IAnalysisOutput {
   data: {
     [key: string]: any;
   };
-  events: Array<{
-    type: string;
-    label: string;
-    body: {
-      description: string;
-      interference: Array<interferenceNode>;
-    };
-  }>;
+  diff: string;
+  events: dependency[];
 }
 
 class AnalysisOutput implements IAnalysisOutput {
@@ -67,14 +85,8 @@ class AnalysisOutput implements IAnalysisOutput {
   pull_number: number;
   uuid: string;
   data: { [key: string]: any };
-  events: Array<{
-    type: string;
-    label: string;
-    body: {
-      description: string;
-      interference: Array<interferenceNode>;
-    };
-  }>;
+  diff: string;
+  events: dependency[];
 
   constructor(analysisOutput: IAnalysisOutput) {
     this.uuid = analysisOutput.uuid;
@@ -82,8 +94,9 @@ class AnalysisOutput implements IAnalysisOutput {
     this.owner = analysisOutput.owner;
     this.pull_number = analysisOutput.pull_number;
     this.data = analysisOutput.data;
+    this.diff = analysisOutput.diff;
     this.events = analysisOutput.events;
   }
 }
 
-export { IAnalysisOutput, AnalysisOutput, interferenceTypes };
+export { IAnalysisOutput, AnalysisOutput, interferenceTypes, eventTypes };

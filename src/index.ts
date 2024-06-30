@@ -1,9 +1,11 @@
 import { Probot } from "probot";
 import { exec } from "child_process";
 import fs from "fs";
+import path from "path";
 import util from "util";
 import "dotenv/config";
-import { IAnalysisOutput, interferenceTypes } from "./models/AnalysisOutput";
+import { v4 as uuidv4 } from "uuid";
+import { IAnalysisOutput, dependency } from "./models/AnalysisOutput";
 const pexec = util.promisify(exec);
 
 // Initialize probot app
@@ -46,47 +48,30 @@ export default (app: Probot) => {
     await pexec(`git merge ${right}`);
     merge_commit = (await pexec(`git rev-parse HEAD`)).stdout.trim();
 
+    // Execute the two-dott diff between the base commit and the merge commit
+    const { stdout: diffOutput } = await pexec(`git diff ${merge_base} ${merge_commit}`);
+    console.log(diffOutput);
+
     // Call the static-semantic-merge tool
-    const mergerPath = process.env.MERGER_PATH;
+    const dependenciesPath = process.env.MERGER_PATH;
     const staticSemanticMergePath = process.env.STATIC_SEMANTIC_MERGE_PATH;
     const gradlePath = process.env.GRADLE_PATH;
     const mavenPath = process.env.MAVEN_PATH;
-
-    /*
-      `java`,
-      `-jar ${staticSemanticMergePath}`,
-      `${merge_commit}`,
-      `${left}`,
-      `${right}`,
-      `${merge_base}`,
-      `${mergerPath}`,
-      `${gradlePath}`,
-      `${mavenPath}`
-    */
-
-    /*
-      `java`,
-      `--illegal-access=warn`,
-      `-jar ${staticSemanticMergePath}`,
-      `-h ${merge_commit}`,
-      `-p ${left} ${right}`,
-      `-b ${merge_base}`,
-      `-ssm ${mergerPath}`,
-      `-gp ${gradlePath}`,
-      `-mvp ${mavenPath}`,
-      `-mp ./`
-    */
+    const scriptsPath = process.env.SCRIPTS_PATH;
 
     const cmd = [
       `java`,
       `-jar ${staticSemanticMergePath}`,
-      `${merge_commit}`,
-      `${left}`,
-      `${right}`,
-      `${merge_base}`,
-      `${mergerPath}`,
-      `${gradlePath}`,
-      `${mavenPath}`
+      `-hc ${merge_commit}`,
+      `-pc ${left} ${right}`,
+      `-bc ${merge_base}`,
+      `-dp ${dependenciesPath}`,
+      `-tpr ./`,
+      `-cn org.example.Main`,
+      `-m main`,
+      `-gp ${gradlePath}`,
+      `-mp ${mavenPath}`,
+      `-sp ${scriptsPath}`
     ];
 
     console.log("Running static-semantic-merge...");
@@ -105,10 +90,29 @@ export default (app: Probot) => {
     try {
       fs.mkdirSync(`../src/data/reports/${repo}/`, { recursive: true });
       fs.copyFileSync("out.txt", `../src/data/reports/${repo}/out.txt`);
+      fs.copyFileSync("out.json", `../src/data/reports/${repo}/out.json`);
       fs.copyFileSync("./data/soot-results.csv", `../src/data/reports/${repo}/soot-results.csv`);
     } catch (error) {
       console.log(error);
     }
+
+    // get the JSON output
+    const jsonOutput = JSON.parse(fs.readFileSync(`out.json`, "utf-8")) as dependency[];
+
+    // adjust the paths of the files in the JSON output
+    const filePathFindingStart = performance.now();
+    jsonOutput.forEach((dependency) => {
+      dependency.body.interference.forEach((interference) => {
+        // Get the path of the Java file
+        let javaFilePath = interference.location.class.replace(".", "/") + ".java";
+        javaFilePath = searchFile(".", javaFilePath, true) ?? "UNKNOWN";
+
+        // Set the path of the Java file
+        interference.location.file = javaFilePath;
+      });
+    });
+    const filePathFindingEnd = performance.now();
+    console.log(`File path finding took ${filePathFindingEnd - filePathFindingStart} ms`);
 
     // Go back to the original directory and delete the cloned repository
     process.chdir("..");
@@ -128,93 +132,15 @@ Merge base: ${merge_base}`,
       event: "COMMENT"
     });
 
-    /* Analysis output
-
-    Wanted Entry Name: samples/OverrideAssignmentVariable.class
-    Running left right NonCommutativeConflictDetectionAlgorithm{name = OA Intra}
-    Using jar at D:\Arquivos\Documentos\IC\Repositorios\basic-app\semantic-conflict\.\files\project\036dcd0b879708b62fc0b599e8b7614dbbbb10ee\original-without-dependencies\merge\build.jar
-    Soot started on Thu Apr 04 00:33:20 BRT 2024
-    Soot finished on Thu Apr 04 00:33:20 BRT 2024
-    Soot has run for 0 min. 0 sec.
-    Analysis results
-    ----------------------------
-    Number of conflicts: 1
-    Results exported to out.txt
-    ----------------------------
-    Running right left NonCommutativeConflictDetectionAlgorithm{name = OA Intra}
-    Using jar at D:\Arquivos\Documentos\IC\Repositorios\basic-app\semantic-conflict\.\files\project\036dcd0b879708b62fc0b599e8b7614dbbbb10ee\original-without-dependencies\merge\build.jar
-    Soot started on Thu Apr 04 00:33:20 BRT 2024
-    Soot finished on Thu Apr 04 00:33:21 BRT 2024
-    Soot has run for 0 min. 0 sec.
-    Analysis results
-    ----------------------------
-    Number of conflicts: 1
-    Results exported to out.txt
-    ----------------------------
-    Wanted Entry Name: samples/OverrideAssignmentVariable.class
-    Running left right NonCommutativeConflictDetectionAlgorithm{name = OA Inter}
-    Using jar at D:\Arquivos\Documentos\IC\Repositorios\basic-app\semantic-conflict\.\files\project\036dcd0b879708b62fc0b599e8b7614dbbbb10ee\original-without-dependencies\merge\build.jar
-    abr 04, 2024 12:33:22 AM br.unb.cic.analysis.ioa.InterproceduralOverrideAssignment internalTransform
-    INFORMA��ES: CONFLICTS: [source(samples.OverrideAssignmentVariable, conflict, 10, x = 2, [Stacktrace{sootClass=OverrideAssignmentVariable, sootMethod=void conflict(), lineNumber=10}]) => sink(samples.OverrideAssignmentVariable, conflict, 7, x = 0, [Stacktrace{sootClass=OverrideAssignmentVariable, sootMethod=void conflict(), lineNumber=7}])]
-    Runtime: 0.022s
-    Analysis results
-    ----------------------------
-    Number of conflicts: 1
-    Results exported to out.txt
-    ----------------------------
-    Running right left NonCommutativeConflictDetectionAlgorithm{name = OA Inter}
-    Using jar at D:\Arquivos\Documentos\IC\Repositorios\basic-app\semantic-conflict\.\files\project\036dcd0b879708b62fc0b599e8b7614dbbbb10ee\original-without-dependencies\merge\build.jar
-    abr 04, 2024 12:33:24 AM br.unb.cic.analysis.ioa.InterproceduralOverrideAssignment internalTransform
-    INFORMA��ES: CONFLICTS: [source(samples.OverrideAssignmentVariable, conflict, 10, x = 2, [Stacktrace{sootClass=OverrideAssignmentVariable, sootMethod=void conflict(), lineNumber=10}]) => sink(samples.OverrideAssignmentVariable, conflict, 7, x = 0, [Stacktrace{sootClass=OverrideAssignmentVariable, sootMethod=void conflict(), lineNumber=7}])]
-    Runtime: 0.023s
-    Analysis results
-    ----------------------------
-    Number of conflicts: 1
-    Results exported to out.txt
-    ----------------------------
-
-    */
-
     // Send the analysis results to the analysis server
     const analysisOutput: IAnalysisOutput = {
-      uuid: "661579e387487aec69fb6a4a",
+      uuid: uuidv4(),
       repository: repo,
       owner: owner,
       pull_number: pull_number,
       data: {},
-      events: [
-        {
-          type: "leftRightOAIntra",
-          label: "at samples.OverrideAssignmentVariable.conflict(OverrideAssignmentVariable.java:9)",
-          body: {
-            description: "OA conflict",
-            interference: [
-              {
-                type: interferenceTypes.OA.DECLARATION,
-                branch: "L",
-                text: "int x = 1;",
-                location: {
-                  file: "src/main/java/samples/OverrideAssignmentVariable.java",
-                  class: "samples.OverrideAssignmentVariable",
-                  method: "conflict",
-                  line: 5
-                }
-              },
-              {
-                type: interferenceTypes.OA.OVERRIDE,
-                branch: "R",
-                text: "x = 2;",
-                location: {
-                  file: "src/main/java/samples/OverrideAssignmentVariable.java",
-                  class: "samples.OverrideAssignmentVariable",
-                  method: "conflict",
-                  line: 9
-                }
-              }
-            ]
-          }
-        }
-      ]
+      diff: diffOutput,
+      events: jsonOutput
     };
 
     await fetch("http://localhost:4000/analysis", {
@@ -228,3 +154,23 @@ Merge base: ${merge_base}`,
       .catch((error) => console.log(error));
   });
 };
+
+function searchFile(source: string, filePath: string, recursive: boolean = false): string | null {
+  // Check if the file exists in the source directory
+  const searchPath = path.join(source, filePath);
+  if (fs.existsSync(searchPath)) return searchPath;
+  if (!recursive) return null;
+
+  // Get the subdirectories of the source directory
+  const dirs = fs
+    .readdirSync(source, { withFileTypes: true })
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => dirent.name);
+
+  // Search the file in the subdirectories
+  for (let dir of dirs) {
+    const result = searchFile(path.join(source, dir), filePath, true);
+    if (result) return result;
+  }
+  return null;
+}
