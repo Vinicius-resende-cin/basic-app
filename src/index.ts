@@ -1,6 +1,7 @@
 import { Probot } from "probot";
 import { exec } from "child_process";
 import fs from "fs";
+import path from "path";
 import util from "util";
 import "dotenv/config";
 import { v4 as uuidv4 } from "uuid";
@@ -98,6 +99,21 @@ export default (app: Probot) => {
     // get the JSON output
     const jsonOutput = JSON.parse(fs.readFileSync(`out.json`, "utf-8")) as dependency[];
 
+    // adjust the paths of the files in the JSON output
+    const filePathFindingStart = performance.now();
+    jsonOutput.forEach((dependency) => {
+      dependency.body.interference.forEach((interference) => {
+        // Get the path of the Java file
+        let javaFilePath = interference.location.class.replace(".", "/") + ".java";
+        javaFilePath = searchFile(".", javaFilePath, true) ?? "UNKNOWN";
+
+        // Set the path of the Java file
+        interference.location.file = javaFilePath;
+      });
+    });
+    const filePathFindingEnd = performance.now();
+    console.log(`File path finding took ${filePathFindingEnd - filePathFindingStart} ms`);
+
     // Go back to the original directory and delete the cloned repository
     process.chdir("..");
     fs.rm(repo, { recursive: true, force: true }, (err) => {
@@ -138,3 +154,23 @@ Merge base: ${merge_base}`,
       .catch((error) => console.log(error));
   });
 };
+
+function searchFile(source: string, filePath: string, recursive: boolean = false): string | null {
+  // Check if the file exists in the source directory
+  const searchPath = path.join(source, filePath);
+  if (fs.existsSync(searchPath)) return searchPath;
+  if (!recursive) return null;
+
+  // Get the subdirectories of the source directory
+  const dirs = fs
+    .readdirSync(source, { withFileTypes: true })
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => dirent.name);
+
+  // Search the file in the subdirectories
+  for (let dir of dirs) {
+    const result = searchFile(path.join(source, dir), filePath, true);
+    if (result) return result;
+  }
+  return null;
+}
