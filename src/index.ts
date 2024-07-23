@@ -49,7 +49,7 @@ export default (app: Probot) => {
     merge_commit = (await pexec(`git rev-parse HEAD`)).stdout.trim();
 
     // Execute the two-dott diff between the base commit and the merge commit
-    const { stdout: diffOutput } = await pexec(`git diff ${merge_base} ${merge_commit}`);
+    const { stdout: diffOutput } = await pexec(`git diff ${merge_base} ${merge_commit} -U10000`);
     console.log(diffOutput);
 
     // Call the static-semantic-merge tool
