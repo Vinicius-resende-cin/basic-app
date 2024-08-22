@@ -49,7 +49,7 @@ export default (app: Probot) => {
     merge_commit = (await pexec(`git rev-parse HEAD`)).stdout.trim();
 
     // Execute the two-dott diff between the base commit and the merge commit
-    const { stdout: diffOutput } = await pexec(`git diff ${merge_base} ${merge_commit}`);
+    const { stdout: diffOutput } = await pexec(`git diff ${merge_base} ${merge_commit} -U10000`);
     console.log(diffOutput);
 
     // Call the static-semantic-merge tool
@@ -114,6 +114,38 @@ export default (app: Probot) => {
     const filePathFindingEnd = performance.now();
     console.log(`File path finding took ${filePathFindingEnd - filePathFindingStart} ms`);
 
+    // Get the modified lines for each branch
+
+    // Search for the modified-lines.txt file
+    const modifiedLinesFile = searchFile("./files/project", "modified-lines.txt", true);
+
+    // Get the modified methods from the file
+    let modifiedLines = [];
+    if (modifiedLinesFile) {
+      const sections = fs.readFileSync(modifiedLinesFile, "utf-8").split("\n\n");
+
+      for (let section of sections) {
+        console.log(section);
+        const lines = section.split("\n").map((line) => line.substring(line.indexOf(":") + 1).trim());
+        if (lines.length < 5) {
+          console.log("Invalid section");
+          continue;
+        }
+
+        const className = lines[0];
+        const fileName = className.split(".").pop() + ".java";
+        modifiedLines.push({
+          file: fileName,
+          leftAdded: JSON.parse(lines[1]),
+          leftRemoved: JSON.parse(lines[2]),
+          rightAdded: JSON.parse(lines[3]),
+          rightRemoved: JSON.parse(lines[4])
+        });
+
+        console.log(modifiedLines);
+      }
+    }
+
     // Go back to the original directory and delete the cloned repository
     process.chdir("..");
     fs.rm(repo, { recursive: true, force: true }, (err) => {
@@ -138,7 +170,9 @@ Merge base: ${merge_base}`,
       repository: repo,
       owner: owner,
       pull_number: pull_number,
-      data: {},
+      data: {
+        modifiedLines: modifiedLines
+      },
       diff: diffOutput,
       events: jsonOutput
     };

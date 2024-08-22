@@ -50,12 +50,18 @@ type lineLocation = {
   line: number;
 };
 
+type tracedNode = {
+  class: string;
+  method: string;
+  line: number;
+};
+
 type interferenceNode = {
   type: interferenceType;
   branch: "L" | "R";
   text: string;
   location: lineLocation;
-  stackTrace?: Array<string>;
+  stackTrace?: Array<tracedNode>;
 };
 
 export type dependency = {
