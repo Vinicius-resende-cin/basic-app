@@ -11,7 +11,7 @@ const pexec = util.promisify(exec);
 // Initialize probot app
 export default (app: Probot) => {
   // Receives a webhook event for every opened pull request
-  app.on("pull_request.opened", async (context) => {
+  app.on(["pull_request.opened", "pull_request.reopened"], async (context) => {
     // Get owner, repo and pull number from the context
     const { owner, repo, pull_number } = context.pullRequest();
 
