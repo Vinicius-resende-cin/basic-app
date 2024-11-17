@@ -50,7 +50,6 @@ export default (app: Probot) => {
 
     // Execute the two-dott diff between the base commit and the merge commit
     const { stdout: diffOutput } = await pexec(`git diff ${merge_base} ${merge_commit} -U10000`);
-    console.log(diffOutput);
 
     // Call the static-semantic-merge tool
     const dependenciesPath = process.env.MERGER_PATH;
@@ -82,19 +81,12 @@ export default (app: Probot) => {
       // Log the output and error
       console.log(analysis_output);
       console.log(analysis_error);
-    } catch (error) {
-      console.log(error);
-    }
 
     // Copy the outputs to the data directory
-    try {
       fs.mkdirSync(`../src/data/reports/${repo}/`, { recursive: true });
       fs.copyFileSync("out.txt", `../src/data/reports/${repo}/out.txt`);
       fs.copyFileSync("out.json", `../src/data/reports/${repo}/out.json`);
       fs.copyFileSync("./data/soot-results.csv", `../src/data/reports/${repo}/soot-results.csv`);
-    } catch (error) {
-      console.log(error);
-    }
 
     // get the JSON output
     const jsonOutput = JSON.parse(fs.readFileSync(`out.json`, "utf-8")) as dependency[];
@@ -146,24 +138,6 @@ export default (app: Probot) => {
       }
     }
 
-    // Go back to the original directory and delete the cloned repository
-    process.chdir("..");
-    fs.rm(repo, { recursive: true, force: true }, (err) => {
-      if (err) throw err;
-    });
-
-    // Create a review comment with the commit information
-    await context.octokit.pulls.createReview({
-      owner,
-      repo,
-      pull_number: pull_number,
-      body: `Merge commit (não presente na árvore de commits): ${merge_commit}
-Parents: ${left} ${right}
-Merge base: ${merge_base}`,
-      comments: [],
-      event: "COMMENT"
-    });
-
     // Send the analysis results to the analysis server
     const analysisOutput: IAnalysisOutput = {
       uuid: uuidv4(),
@@ -186,6 +160,15 @@ Merge base: ${merge_base}`,
     })
       .then((res) => console.log(res.text()))
       .catch((error) => console.log(error));
+    } catch (error) {
+      console.log(error);
+    } finally {
+      // Go back to the original directory and delete the cloned repository
+      process.chdir("..");
+      fs.rm(repo, { recursive: true, force: true }, (err) => {
+        if (err) throw err;
+      });
+    }
   });
 };
 
