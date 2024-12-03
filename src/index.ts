@@ -8,8 +8,18 @@ import { v4 as uuidv4 } from "uuid";
 import { IAnalysisOutput, dependency } from "./models/AnalysisOutput";
 import { filterDuplicatedDependencies } from "./util/dependency";
 import AnalysisService from "./services/analysisService";
+import { PerformanceObserver } from "perf_hooks";
 const pexec = util.promisify(exec);
 
+// Define a performance observer
+const perfObserver = new PerformanceObserver((items) => {
+  items.getEntries().forEach((entry) => {
+    console.debug(`[DEBUG] ${entry.name} took ${entry.duration} ms`);
+  });
+});
+perfObserver.observe({ entryTypes: ["measure"], buffered: true });
+
+// Get the analysis API URL
 const apiUrl = process.env.ANALYSIS_API;
 if (!apiUrl) throw new Error("ANALYSIS_API is not set");
 const analysisService = new AnalysisService(apiUrl);
@@ -22,42 +32,49 @@ export default (app: Probot) => {
     const { owner, repo, pull_number } = context.pullRequest();
 
     // Get the merge commit sha (awaits until the merge commit is created)
+    startPerformance("wait_merge_commit");
     let merge_commit = (await context.octokit.pulls.get({ owner, repo, pull_number })).data.merge_commit_sha;
     for (let i = 0; !merge_commit && i < 5; i++) {
       console.log("Waiting for merge commit...");
       await new Promise((resolve) => setTimeout(resolve, 2000));
       merge_commit = (await context.octokit.pulls.get({ owner, repo, pull_number })).data.merge_commit_sha;
     }
+    endPerformance("wait_merge_commit");
 
     // If there is no merge commit, throw an error
     if (!merge_commit) throw new Error("No merge commit sha");
-    console.log(merge_commit);
 
     // Get the parents of the merge commit
     const { parents } = (await context.octokit.repos.getCommit({ owner, repo, ref: merge_commit })).data;
     const left = parents[0].sha;
     const right = parents[1].sha;
-    console.log(left, right);
 
     // Clone the repository
+    console.log("Cloning repository...");
+    startPerformance("clone_repository");
     if (fs.existsSync(repo)) fs.rmSync(repo, { recursive: true, force: true });
     await pexec(`git clone https://github.com/${owner}/${repo}`);
     process.chdir(repo);
+    endPerformance("clone_repository");
 
     // Get the merge base of the parents
     let { stdout: merge_base } = await pexec(`git merge-base ${left} ${right}`);
     merge_base = merge_base.trim();
-    console.log(merge_base);
 
     // Create a real merge commit on the local repository
+    startPerformance("create_local_merge_commit");
     await pexec(`git checkout ${left}`);
     await pexec(`git merge ${right}`);
     merge_commit = (await pexec(`git rev-parse HEAD`)).stdout.trim();
+    endPerformance("create_local_merge_commit");
+    console.log(`Found all commits: (left)${left} (right)${right} (base)${merge_base} (merge)${merge_commit}`);
 
     // Execute the two-dott diff between the base commit and the merge commit
+    startPerformance("git_diff");
     const { stdout: diffOutput } = await pexec(`git diff ${merge_base} ${merge_commit} -U10000`);
+    endPerformance("git_diff");
 
-    // Call the static-semantic-merge tool
+    // Define the analysis parameters
     const dependenciesPath = process.env.MERGER_PATH;
     const staticSemanticMergePath = process.env.STATIC_SEMANTIC_MERGE_PATH;
     const gradlePath = process.env.GRADLE_PATH;
@@ -70,6 +87,7 @@ export default (app: Probot) => {
 
     try {
       // Execute the analysis
+      startPerformance("analysis");
       await executeAnalysis(
         staticSemanticMergePath,
         merge_commit,
@@ -81,20 +99,21 @@ export default (app: Probot) => {
         mavenPath,
         scriptsPath
       );
+      endPerformance("analysis");
 
       if (process.env.APP_ENV === "development") {
-      // Copy the outputs to the data directory
-      fs.mkdirSync(`../src/data/reports/${repo}/`, { recursive: true });
-      fs.copyFileSync("out.txt", `../src/data/reports/${repo}/out.txt`);
-      fs.copyFileSync("out.json", `../src/data/reports/${repo}/out.json`);
-      fs.copyFileSync("./data/soot-results.csv", `../src/data/reports/${repo}/soot-results.csv`);
+        // Copy the outputs to the data directory
+        fs.mkdirSync(`../src/data/reports/${repo}/`, { recursive: true });
+        fs.copyFileSync("out.txt", `../src/data/reports/${repo}/out.txt`);
+        fs.copyFileSync("out.json", `../src/data/reports/${repo}/out.json`);
+        fs.copyFileSync("./data/soot-results.csv", `../src/data/reports/${repo}/soot-results.csv`);
       }
 
       // get the JSON output
       let jsonOutput = JSON.parse(fs.readFileSync(`out.json`, "utf-8")) as dependency[];
 
       // adjust the paths of the files in the JSON output
-      const filePathFindingStart = performance.now();
+      startPerformance("file_path_finding");
       jsonOutput.forEach((dependency) => {
         dependency.body.interference.forEach((interference) => {
           // Get the path of the Java file
@@ -105,16 +124,17 @@ export default (app: Probot) => {
           interference.location.file = javaFilePath;
         });
       });
-      const filePathFindingEnd = performance.now();
-      console.log(`File path finding took ${filePathFindingEnd - filePathFindingStart} ms`);
+      endPerformance("file_path_finding");
 
       // filter the duplicated dependencies
       const totalDependencies = jsonOutput.length;
+      startPerformance("filter_duplicated_dependencies");
       jsonOutput = filterDuplicatedDependencies(jsonOutput);
+      endPerformance("filter_duplicated_dependencies");
       console.log(`Filtered ${totalDependencies - jsonOutput.length} duplicated dependencies`);
 
       // Get the modified lines for each branch
-
+      startPerformance("get_modified_lines");
       // Search for the modified-lines.txt file
       const modifiedLinesFile = searchFile("./files/project", "modified-lines.txt", true);
 
@@ -138,10 +158,9 @@ export default (app: Probot) => {
             rightAdded: JSON.parse(lines[3]),
             rightRemoved: JSON.parse(lines[4])
           });
-
-          console.log(modifiedLines);
         }
       }
+      endPerformance("get_modified_lines");
 
       // Send the analysis results to the analysis server
       const analysisOutput: IAnalysisOutput = {
@@ -227,3 +246,12 @@ function searchFile(source: string, filePath: string, recursive: boolean = false
   }
   return null;
 }
+
+const startPerformance = (name: string) => {
+  performance.mark(`start_${name}`);
+};
+
+const endPerformance = async (name: string) => {
+  performance.mark(`end_${name}`);
+  performance.measure(name, `start_${name}`, `end_${name}`);
+};
