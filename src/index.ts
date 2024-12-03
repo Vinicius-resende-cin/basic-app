@@ -64,29 +64,23 @@ export default (app: Probot) => {
     const mavenPath = process.env.MAVEN_PATH;
     const scriptsPath = process.env.SCRIPTS_PATH;
 
-    const cmd = [
-      `java`,
-      `-jar ${staticSemanticMergePath}`,
-      `-hc ${merge_commit}`,
-      `-pc ${left} ${right}`,
-      `-bc ${merge_base}`,
-      `-dp ${dependenciesPath}`,
-      `-tpr ./`,
-      `-cn org.example.Main`,
-      `-m main`,
-      `-gp ${gradlePath}`,
-      `-mp ${mavenPath}`,
-      `-sp ${scriptsPath}`
-    ];
-
-    console.log("Running static-semantic-merge...");
+    if (!dependenciesPath || !staticSemanticMergePath || !gradlePath || !mavenPath || !scriptsPath) {
+      throw new Error("Environment variables not set");
+    }
 
     try {
-      const { stdout: analysis_output, stderr: analysis_error } = await pexec(cmd.join(" "));
-
-      // Log the output and error
-      console.log(analysis_output);
-      console.log(analysis_error);
+      // Execute the analysis
+      await executeAnalysis(
+        staticSemanticMergePath,
+        merge_commit,
+        left,
+        right,
+        merge_base,
+        dependenciesPath,
+        gradlePath,
+        mavenPath,
+        scriptsPath
+      );
 
       // Copy the outputs to the data directory
       fs.mkdirSync(`../src/data/reports/${repo}/`, { recursive: true });
@@ -171,6 +165,41 @@ export default (app: Probot) => {
     }
   });
 };
+
+async function executeAnalysis(
+  staticSemanticMergePath: string,
+  merge: string,
+  left: string,
+  right: string,
+  base: string,
+  dependenciesPath: string,
+  gradlePath: string,
+  mavenPath: string,
+  scriptsPath: string
+) {
+  const cmd = [
+    `java`,
+    `-jar ${staticSemanticMergePath}`,
+    `-hc ${merge}`,
+    `-pc ${left} ${right}`,
+    `-bc ${base}`,
+    `-dp ${dependenciesPath}`,
+    `-tpr ./`,
+    `-cn org.example.Main`,
+    `-m main`,
+    `-gp ${gradlePath}`,
+    `-mp ${mavenPath}`,
+    `-sp ${scriptsPath}`
+  ];
+
+  console.log("Running static-semantic-merge...");
+
+  const { stdout: analysis_output, stderr: analysis_error } = await pexec(cmd.join(" "));
+
+  // Log the output and error
+  console.log(analysis_output);
+  console.log(analysis_error);
+}
 
 function searchFile(source: string, filePath: string, recursive: boolean = false): string | null {
   // Check if the file exists in the source directory
