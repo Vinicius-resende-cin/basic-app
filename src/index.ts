@@ -7,7 +7,12 @@ import "dotenv/config";
 import { v4 as uuidv4 } from "uuid";
 import { IAnalysisOutput, dependency } from "./models/AnalysisOutput";
 import { filterDuplicatedDependencies } from "./util/dependency";
+import AnalysisService from "./services/analysisService";
 const pexec = util.promisify(exec);
+
+const apiUrl = process.env.ANALYSIS_API;
+if (!apiUrl) throw new Error("ANALYSIS_API is not set");
+const analysisService = new AnalysisService(apiUrl);
 
 // Initialize probot app
 export default (app: Probot) => {
@@ -154,16 +159,7 @@ export default (app: Probot) => {
         diff: diffOutput,
         events: jsonOutput
       };
-
-      await fetch("http://localhost:4000/analysis", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ analysis: analysisOutput })
-      })
-        .then((res) => console.log(res.text()))
-        .catch((error) => console.log(error));
+      await analysisService.sendAnalysis(analysisOutput);
     } catch (error) {
       console.log(error);
     } finally {
