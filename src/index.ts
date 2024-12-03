@@ -6,6 +6,7 @@ import util from "util";
 import "dotenv/config";
 import { v4 as uuidv4 } from "uuid";
 import { IAnalysisOutput, dependency } from "./models/AnalysisOutput";
+import { filterDuplicatedDependencies } from "./util/dependency";
 const pexec = util.promisify(exec);
 
 // Initialize probot app
@@ -89,7 +90,7 @@ export default (app: Probot) => {
       fs.copyFileSync("./data/soot-results.csv", `../src/data/reports/${repo}/soot-results.csv`);
 
       // get the JSON output
-      const jsonOutput = JSON.parse(fs.readFileSync(`out.json`, "utf-8")) as dependency[];
+      let jsonOutput = JSON.parse(fs.readFileSync(`out.json`, "utf-8")) as dependency[];
 
       // adjust the paths of the files in the JSON output
       const filePathFindingStart = performance.now();
@@ -106,6 +107,11 @@ export default (app: Probot) => {
       const filePathFindingEnd = performance.now();
       console.log(`File path finding took ${filePathFindingEnd - filePathFindingStart} ms`);
 
+      // filter the duplicated dependencies
+      const totalDependencies = jsonOutput.length;
+      jsonOutput = filterDuplicatedDependencies(jsonOutput);
+      console.log(`Filtered ${totalDependencies - jsonOutput.length} duplicated dependencies`);
+
       // Get the modified lines for each branch
 
       // Search for the modified-lines.txt file
@@ -117,10 +123,8 @@ export default (app: Probot) => {
         const sections = fs.readFileSync(modifiedLinesFile, "utf-8").split("\n\n");
 
         for (let section of sections) {
-          console.log(section);
           const lines = section.split("\n").map((line) => line.substring(line.indexOf(":") + 1).trim());
           if (lines.length < 5) {
-            console.log("Invalid section");
             continue;
           }
 
