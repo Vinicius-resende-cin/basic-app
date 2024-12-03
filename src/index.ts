@@ -82,11 +82,13 @@ export default (app: Probot) => {
         scriptsPath
       );
 
+      if (process.env.APP_ENV === "development") {
       // Copy the outputs to the data directory
       fs.mkdirSync(`../src/data/reports/${repo}/`, { recursive: true });
       fs.copyFileSync("out.txt", `../src/data/reports/${repo}/out.txt`);
       fs.copyFileSync("out.json", `../src/data/reports/${repo}/out.json`);
       fs.copyFileSync("./data/soot-results.csv", `../src/data/reports/${repo}/soot-results.csv`);
+      }
 
       // get the JSON output
       let jsonOutput = JSON.parse(fs.readFileSync(`out.json`, "utf-8")) as dependency[];
