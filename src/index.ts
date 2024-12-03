@@ -82,84 +82,84 @@ export default (app: Probot) => {
       console.log(analysis_output);
       console.log(analysis_error);
 
-    // Copy the outputs to the data directory
+      // Copy the outputs to the data directory
       fs.mkdirSync(`../src/data/reports/${repo}/`, { recursive: true });
       fs.copyFileSync("out.txt", `../src/data/reports/${repo}/out.txt`);
       fs.copyFileSync("out.json", `../src/data/reports/${repo}/out.json`);
       fs.copyFileSync("./data/soot-results.csv", `../src/data/reports/${repo}/soot-results.csv`);
 
-    // get the JSON output
-    const jsonOutput = JSON.parse(fs.readFileSync(`out.json`, "utf-8")) as dependency[];
+      // get the JSON output
+      const jsonOutput = JSON.parse(fs.readFileSync(`out.json`, "utf-8")) as dependency[];
 
-    // adjust the paths of the files in the JSON output
-    const filePathFindingStart = performance.now();
-    jsonOutput.forEach((dependency) => {
-      dependency.body.interference.forEach((interference) => {
-        // Get the path of the Java file
-        let javaFilePath = interference.location.class.replace(".", "/") + ".java";
-        javaFilePath = searchFile(".", javaFilePath, true) ?? "UNKNOWN";
+      // adjust the paths of the files in the JSON output
+      const filePathFindingStart = performance.now();
+      jsonOutput.forEach((dependency) => {
+        dependency.body.interference.forEach((interference) => {
+          // Get the path of the Java file
+          let javaFilePath = interference.location.class.replace(".", "/") + ".java";
+          javaFilePath = searchFile(".", javaFilePath, true) ?? "UNKNOWN";
 
-        // Set the path of the Java file
-        interference.location.file = javaFilePath;
-      });
-    });
-    const filePathFindingEnd = performance.now();
-    console.log(`File path finding took ${filePathFindingEnd - filePathFindingStart} ms`);
-
-    // Get the modified lines for each branch
-
-    // Search for the modified-lines.txt file
-    const modifiedLinesFile = searchFile("./files/project", "modified-lines.txt", true);
-
-    // Get the modified methods from the file
-    let modifiedLines = [];
-    if (modifiedLinesFile) {
-      const sections = fs.readFileSync(modifiedLinesFile, "utf-8").split("\n\n");
-
-      for (let section of sections) {
-        console.log(section);
-        const lines = section.split("\n").map((line) => line.substring(line.indexOf(":") + 1).trim());
-        if (lines.length < 5) {
-          console.log("Invalid section");
-          continue;
-        }
-
-        const className = lines[0];
-        const fileName = className.split(".").pop() + ".java";
-        modifiedLines.push({
-          file: fileName,
-          leftAdded: JSON.parse(lines[1]),
-          leftRemoved: JSON.parse(lines[2]),
-          rightAdded: JSON.parse(lines[3]),
-          rightRemoved: JSON.parse(lines[4])
+          // Set the path of the Java file
+          interference.location.file = javaFilePath;
         });
+      });
+      const filePathFindingEnd = performance.now();
+      console.log(`File path finding took ${filePathFindingEnd - filePathFindingStart} ms`);
 
-        console.log(modifiedLines);
+      // Get the modified lines for each branch
+
+      // Search for the modified-lines.txt file
+      const modifiedLinesFile = searchFile("./files/project", "modified-lines.txt", true);
+
+      // Get the modified methods from the file
+      let modifiedLines = [];
+      if (modifiedLinesFile) {
+        const sections = fs.readFileSync(modifiedLinesFile, "utf-8").split("\n\n");
+
+        for (let section of sections) {
+          console.log(section);
+          const lines = section.split("\n").map((line) => line.substring(line.indexOf(":") + 1).trim());
+          if (lines.length < 5) {
+            console.log("Invalid section");
+            continue;
+          }
+
+          const className = lines[0];
+          const fileName = className.split(".").pop() + ".java";
+          modifiedLines.push({
+            file: fileName,
+            leftAdded: JSON.parse(lines[1]),
+            leftRemoved: JSON.parse(lines[2]),
+            rightAdded: JSON.parse(lines[3]),
+            rightRemoved: JSON.parse(lines[4])
+          });
+
+          console.log(modifiedLines);
+        }
       }
-    }
 
-    // Send the analysis results to the analysis server
-    const analysisOutput: IAnalysisOutput = {
-      uuid: uuidv4(),
-      repository: repo,
-      owner: owner,
-      pull_number: pull_number,
-      data: {
-        modifiedLines: modifiedLines
-      },
-      diff: diffOutput,
-      events: jsonOutput
-    };
+      // Send the analysis results to the analysis server
+      const analysisOutput: IAnalysisOutput = {
+        uuid: uuidv4(),
+        repository: repo,
+        owner: owner,
+        pull_number: pull_number,
+        data: {
+          modifiedLines: modifiedLines
+        },
+        diff: diffOutput,
+        events: jsonOutput
+      };
 
-    await fetch("http://localhost:4000/analysis", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ analysis: analysisOutput })
-    })
-      .then((res) => console.log(res.text()))
-      .catch((error) => console.log(error));
+      await fetch("http://localhost:4000/analysis", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ analysis: analysisOutput })
+      })
+        .then((res) => console.log(res.text()))
+        .catch((error) => console.log(error));
     } catch (error) {
       console.log(error);
     } finally {
@@ -179,15 +179,20 @@ function searchFile(source: string, filePath: string, recursive: boolean = false
   if (!recursive) return null;
 
   // Get the subdirectories of the source directory
-  const dirs = fs
-    .readdirSync(source, { withFileTypes: true })
-    .filter((dirent) => dirent.isDirectory())
-    .map((dirent) => dirent.name);
+  try {
+    const dirs = fs
+      .readdirSync(source, { withFileTypes: true })
+      .filter((dirent) => dirent.isDirectory())
+      .map((dirent) => dirent.name);
 
-  // Search the file in the subdirectories
-  for (let dir of dirs) {
-    const result = searchFile(path.join(source, dir), filePath, true);
-    if (result) return result;
+    // Search the file in the subdirectories
+    for (let dir of dirs) {
+      const result = searchFile(path.join(source, dir), filePath, true);
+      if (result) return result;
+    }
+  } catch (error) {
+    console.log(error);
+    return null;
   }
   return null;
 }
