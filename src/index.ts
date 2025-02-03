@@ -55,17 +55,24 @@ export default (app: Probot) => {
     // Get owner, repo and pull number from the context
     const { owner, repo, pull_number } = context.pullRequest();
 
+    //=================== Not valid if repo is not registered
+    if (!(await repoService.isRepoRegistered(owner, repo))) return console.log(`Repo ${repo} is not registered`);
+
+    const getPR = async () => await context.octokit.pulls.get({ owner, repo, pull_number });
+    let PR = await getPR();
+
     // Get the merge commit sha (awaits until the merge commit is created)
     startPerformance("wait_merge_commit");
-    let merge_commit = (await context.octokit.pulls.get({ owner, repo, pull_number })).data.merge_commit_sha;
+    let merge_commit = PR.data.merge_commit_sha;
     for (let i = 0; !merge_commit && i < 5; i++) {
       console.log("Waiting for merge commit...");
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      merge_commit = (await context.octokit.pulls.get({ owner, repo, pull_number })).data.merge_commit_sha;
+      PR = await getPR();
+      merge_commit = PR.data.merge_commit_sha;
     }
     endPerformance("wait_merge_commit");
 
-    // If there is no merge commit, throw an error
+    //=================== Not valid if no merge commit sha
     if (!merge_commit) throw new Error("No merge commit sha");
 
     // Get the parents of the merge commit
