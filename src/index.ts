@@ -70,8 +70,7 @@ export default (app: Probot) => {
     let PR = await getPR();
 
     //=================== Not valid if the PR is closed or not mergeable
-    if (PR.data.state !== "open" || !PR.data.mergeable)
-      return context.log.warn(`PR ${pull_number} from ${repo} is not open or not mergeable`);
+    if (!PR.data.mergeable) return context.log.warn(`PR ${pull_number} from ${repo} is not open or not mergeable`);
 
     // Get the merge commit sha (awaits until the merge commit is created)
     startPerformance("wait_merge_commit");
@@ -103,6 +102,9 @@ export default (app: Probot) => {
     // Get the merge base of the parents
     let { stdout: merge_base } = await pexec(`git merge-base ${left} ${right}`);
     merge_base = merge_base.trim();
+
+    //=================== Not valid if the merge base is the same as the left or right commit
+    if (merge_base === left || merge_base === right) return context.log.warn("Merge base is the same as left or right");
 
     // Create a real merge commit on the local repository
     startPerformance("create_local_merge_commit");
