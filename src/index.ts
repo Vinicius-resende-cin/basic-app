@@ -1,4 +1,4 @@
-import { Probot } from "probot";
+import { Probot, Context } from "probot";
 import { exec } from "child_process";
 import fs from "fs";
 import path from "path";
@@ -12,14 +12,6 @@ import { PerformanceObserver } from "perf_hooks";
 import RepoService from "./services/repoService";
 const pexec = util.promisify(exec);
 
-// Define a performance observer
-const perfObserver = new PerformanceObserver((items) => {
-  items.getEntries().forEach((entry) => {
-    console.debug(`[DEBUG] ${entry.name} took ${entry.duration} ms`);
-  });
-});
-perfObserver.observe({ entryTypes: ["measure"], buffered: true });
-
 // Get the analysis API URL
 const apiUrl = process.env.ANALYSIS_API;
 if (!apiUrl) throw new Error("ANALYSIS_API is not set");
@@ -32,20 +24,36 @@ const repoService = new RepoService(repoApiUrl);
 
 // Initialize probot app
 export default (app: Probot) => {
+  // Define a performance observer
+  const perfObserver = new PerformanceObserver((items) => {
+    items.getEntries().forEach((entry) => {
+      app.log.debug(`[DEBUG] ${entry.name} took ${entry.duration} ms`);
+    });
+  });
+  perfObserver.observe({ entryTypes: ["measure"], buffered: true });
+
   // Receives a webhook event for every installation
   app.on(["installation.created", "installation_repositories.added"], async (context) => {
-    // get the repositories and register them
-    if (context.name === "installation_repositories") {
-      const repositories = context.payload.repositories_added;
-      for (let repository of repositories) {
-        const [owner, repo] = repository.full_name.split("/");
-        try {
-          const response = await repoService.registerRepo(owner, repo);
-          if (response) console.log(`Repository ${repository.full_name} registered`);
-          else console.log(`Repository ${repository.full_name} could not be registered`);
-        } catch (error) {
-          console.log(error);
-        }
+    const installation = context.payload.installation.id;
+
+    // get the repositories
+    let repositories;
+    if (context.name === "installation") {
+      repositories = context.payload.repositories;
+    } else if (context.name === "installation_repositories") {
+      repositories = context.payload.repositories_added;
+    }
+
+    // Register the repositories
+    if (!repositories) return context.log.info(`No repositories added for installation ${installation}`);
+    for (let repository of repositories) {
+      const [owner, repo] = repository.full_name.split("/");
+      try {
+        const response = await repoService.registerRepo(owner, repo);
+        if (response) context.log.info(`Repository ${repository.full_name} registered`);
+        else context.log.warn(`Repository ${repository.full_name} could not be registered`);
+      } catch (error) {
+        context.log.error(`Error registering repository ${repository.full_name}: ${error}`);
       }
     }
   });
@@ -56,16 +64,20 @@ export default (app: Probot) => {
     const { owner, repo, pull_number } = context.pullRequest();
 
     //=================== Not valid if repo is not registered
-    if (!(await repoService.isRepoRegistered(owner, repo))) return console.log(`Repo ${repo} is not registered`);
+    if (!(await repoService.isRepoRegistered(owner, repo))) return context.log.warn(`Repo ${repo} is not registered`);
 
     const getPR = async () => await context.octokit.pulls.get({ owner, repo, pull_number });
     let PR = await getPR();
+
+    //=================== Not valid if the PR is closed or not mergeable
+    if (PR.data.state !== "open" || !PR.data.mergeable)
+      return context.log.warn(`PR ${pull_number} from ${repo} is not open or not mergeable`);
 
     // Get the merge commit sha (awaits until the merge commit is created)
     startPerformance("wait_merge_commit");
     let merge_commit = PR.data.merge_commit_sha;
     for (let i = 0; !merge_commit && i < 5; i++) {
-      console.log("Waiting for merge commit...");
+      context.log.info("Waiting for merge commit...");
       await new Promise((resolve) => setTimeout(resolve, 2000));
       PR = await getPR();
       merge_commit = PR.data.merge_commit_sha;
@@ -81,7 +93,7 @@ export default (app: Probot) => {
     const right = parents[1].sha;
 
     // Clone the repository
-    console.log("Cloning repository...");
+    context.log.info("Cloning repository...");
     startPerformance("clone_repository");
     if (fs.existsSync(repo)) fs.rmSync(repo, { recursive: true, force: true });
     await pexec(`git clone https://github.com/${owner}/${repo}`);
@@ -98,7 +110,7 @@ export default (app: Probot) => {
     await pexec(`git merge ${right}`);
     merge_commit = (await pexec(`git rev-parse HEAD`)).stdout.trim();
     endPerformance("create_local_merge_commit");
-    console.log(`Found all commits: (left)${left} (right)${right} (base)${merge_base} (merge)${merge_commit}`);
+    context.log.info(`Found all commits: (left)${left} (right)${right} (base)${merge_base} (merge)${merge_commit}`);
 
     // Execute the two-dott diff between the base commit and the merge commit
     startPerformance("git_diff");
@@ -128,7 +140,8 @@ export default (app: Probot) => {
         dependenciesPath,
         gradlePath,
         mavenPath,
-        scriptsPath
+        scriptsPath,
+        context
       );
       endPerformance("analysis");
 
@@ -149,7 +162,7 @@ export default (app: Probot) => {
         dependency.body.interference.forEach((interference) => {
           // Get the path of the Java file
           let javaFilePath = interference.location.class.replace(".", "/") + ".java";
-          javaFilePath = searchFile(".", javaFilePath, true) ?? "UNKNOWN";
+          javaFilePath = searchFile(".", javaFilePath, true, context) ?? "UNKNOWN";
 
           // Set the path of the Java file
           interference.location.file = javaFilePath;
@@ -162,12 +175,12 @@ export default (app: Probot) => {
       startPerformance("filter_duplicated_dependencies");
       jsonOutput = filterDuplicatedDependencies(jsonOutput);
       endPerformance("filter_duplicated_dependencies");
-      console.log(`Filtered ${totalDependencies - jsonOutput.length} duplicated dependencies`);
+      context.log.info(`Filtered ${totalDependencies - jsonOutput.length} duplicated dependencies`);
 
       // Get the modified lines for each branch
       startPerformance("get_modified_lines");
       // Search for the modified-lines.txt file
-      const modifiedLinesFile = searchFile("./files/project", "modified-lines.txt", true);
+      const modifiedLinesFile = searchFile("./files/project", "modified-lines.txt", true, context);
 
       // Get the modified methods from the file
       let modifiedLines = [];
@@ -207,13 +220,11 @@ export default (app: Probot) => {
       };
       await analysisService.sendAnalysis(analysisOutput);
     } catch (error) {
-      console.log(error);
+      context.log.error(`Error executing analysis: ${error}`);
     } finally {
       // Go back to the original directory and delete the cloned repository
       process.chdir("..");
-      fs.rm(repo, { recursive: true, force: true }, (err) => {
-        if (err) throw err;
-      });
+      fs.rmSync(repo, { recursive: true, force: true });
     }
   });
 };
@@ -227,7 +238,8 @@ async function executeAnalysis(
   dependenciesPath: string,
   gradlePath: string,
   mavenPath: string,
-  scriptsPath: string
+  scriptsPath: string,
+  context: Context
 ) {
   const cmd = [
     `java`,
@@ -244,16 +256,16 @@ async function executeAnalysis(
     `-sp ${scriptsPath}`
   ];
 
-  console.log("Running static-semantic-merge...");
+  context.log.info("Running static-semantic-merge...");
 
   const { stdout: analysis_output, stderr: analysis_error } = await pexec(cmd.join(" "));
 
   // Log the output and error
-  console.log(analysis_output);
-  console.log(analysis_error);
+  context.log.info(analysis_output);
+  context.log.error(analysis_error);
 }
 
-function searchFile(source: string, filePath: string, recursive: boolean = false): string | null {
+function searchFile(source: string, filePath: string, recursive: boolean = false, context: Context): string | null {
   // Check if the file exists in the source directory
   const searchPath = path.join(source, filePath);
   if (fs.existsSync(searchPath)) return searchPath;
@@ -268,11 +280,11 @@ function searchFile(source: string, filePath: string, recursive: boolean = false
 
     // Search the file in the subdirectories
     for (let dir of dirs) {
-      const result = searchFile(path.join(source, dir), filePath, true);
+      const result = searchFile(path.join(source, dir), filePath, true, context);
       if (result) return result;
     }
   } catch (error) {
-    console.log(error);
+    context.log.error(`Error searching file: ${error}`);
     return null;
   }
   return null;

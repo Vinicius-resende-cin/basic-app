@@ -16,7 +16,6 @@ export default class RepoService implements IRepoService {
   }
 
   async registerRepo(owner: string, repo: string): Promise<boolean> {
-    console.log(this.apiUrl);
     const response = await fetch(`${this.apiUrl}`, {
       method: "POST",
       headers: {
