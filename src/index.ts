@@ -9,6 +9,7 @@ import { IAnalysisOutput, dependency } from "./models/AnalysisOutput";
 import { filterDuplicatedDependencies } from "./util/dependency";
 import AnalysisService from "./services/analysisService";
 import { PerformanceObserver } from "perf_hooks";
+import RepoService from "./services/repoService";
 const pexec = util.promisify(exec);
 
 // Define a performance observer
@@ -24,8 +25,31 @@ const apiUrl = process.env.ANALYSIS_API;
 if (!apiUrl) throw new Error("ANALYSIS_API is not set");
 const analysisService = new AnalysisService(apiUrl);
 
+// Get the repo API URL
+const repoApiUrl = process.env.REPOS_API;
+if (!repoApiUrl) throw new Error("REPOS_API is not set");
+const repoService = new RepoService(repoApiUrl);
+
 // Initialize probot app
 export default (app: Probot) => {
+  // Receives a webhook event for every installation
+  app.on(["installation.created", "installation_repositories.added"], async (context) => {
+    // get the repositories and register them
+    if (context.name === "installation_repositories") {
+      const repositories = context.payload.repositories_added;
+      for (let repository of repositories) {
+        const [owner, repo] = repository.full_name.split("/");
+        try {
+          const response = await repoService.registerRepo(owner, repo);
+          if (response) console.log(`Repository ${repository.full_name} registered`);
+          else console.log(`Repository ${repository.full_name} could not be registered`);
+        } catch (error) {
+          console.log(error);
+        }
+      }
+    }
+  });
+
   // Receives a webhook event for every opened pull request
   app.on(["pull_request.opened", "pull_request.reopened", "pull_request.synchronize"], async (context) => {
     // Get owner, repo and pull number from the context
