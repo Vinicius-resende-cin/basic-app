@@ -10,6 +10,8 @@ import { filterDuplicatedDependencies } from "./util/dependency";
 import AnalysisService from "./services/analysisService";
 import { PerformanceObserver } from "perf_hooks";
 import RepoService from "./services/repoService";
+import SettingsService from "./services/settingsService";
+import { ISettingsData } from "./models/SettingsData";
 const pexec = util.promisify(exec);
 
 // Get the analysis API URL
@@ -21,6 +23,11 @@ const analysisService = new AnalysisService(apiUrl);
 const repoApiUrl = process.env.REPOS_API;
 if (!repoApiUrl) throw new Error("REPOS_API is not set");
 const repoService = new RepoService(repoApiUrl);
+
+// Get the settings API URL
+const settingsApiUrl = process.env.SETTINGS_API;
+if (!settingsApiUrl) throw new Error("SETTINGS_API is not set");
+const settingsService = new SettingsService(settingsApiUrl);
 
 // Initialize probot app
 export default (app: Probot) => {
@@ -130,6 +137,10 @@ export default (app: Probot) => {
       throw new Error("Environment variables not set");
     }
 
+    // Get the pull request settings
+    const settings = await settingsService.getSettings(owner, repo, pull_number);
+    if (!settings) context.log.warn("Settings not found");
+
     try {
       // Execute the analysis
       startPerformance("analysis");
@@ -143,7 +154,8 @@ export default (app: Probot) => {
         gradlePath,
         mavenPath,
         scriptsPath,
-        context
+        context,
+        settings ?? undefined
       );
       endPerformance("analysis");
 
@@ -241,7 +253,8 @@ async function executeAnalysis(
   gradlePath: string,
   mavenPath: string,
   scriptsPath: string,
-  context: Context
+  context: Context,
+  settings?: ISettingsData
 ) {
   const cmd = [
     `java`,
@@ -251,12 +264,19 @@ async function executeAnalysis(
     `-bc ${base}`,
     `-dp ${dependenciesPath}`,
     `-tpr ./`,
-    `-cn org.example.Main`,
-    `-m main`,
     `-gp ${gradlePath}`,
     `-mp ${mavenPath}`,
     `-sp ${scriptsPath}`
   ];
+
+  if (settings) {
+    cmd.push(`-cn "${settings.mainClass}"`);
+    cmd.push(`-m "${settings.mainMethod}"`);
+    if (settings.baseClass) cmd.push(`-ep "${settings.baseClass}"`);
+  } else {
+    cmd.push(`-cn org.example.Main`);
+    cmd.push(`-m main`);
+  }
 
   context.log.info("Running static-semantic-merge...");
 
