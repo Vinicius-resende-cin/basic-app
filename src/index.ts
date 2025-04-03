@@ -220,6 +220,36 @@ export default (app: Probot) => {
       }
       endPerformance("get_modified_lines");
 
+      // search for all related files for each conflict
+      let allFiles: string[] = [];
+      startPerformance("search_related_files");
+      jsonOutput.forEach((dependency) => {
+        dependency.body.interference.forEach((interference) => {
+          interference.stackTrace?.forEach((node) => {
+            // get the java file from the class name
+            let javaFilePath: string | null = node.class.replace(".", "/") + ".java";
+
+            // search for the file in the project directory
+            javaFilePath = searchFile(".", javaFilePath, true, context);
+
+            if (javaFilePath) {
+              // add the file to the list of files
+              allFiles.push(javaFilePath);
+            }
+          });
+        });
+      });
+      endPerformance("search_related_files");
+
+      // remove related files that are already on the diff
+      startPerformance("remove_related_files_from_diff");
+      const diffFiles = diffOutput.split("\n").filter((line) => line.startsWith("diff --git a/"));
+      const missingFiles = allFiles.filter((file) => {
+        return !diffFiles.some((diffFile) => diffFile.includes(file));
+      });
+      endPerformance("remove_related_files_from_diff");
+      context.log.info(`Found ${missingFiles.length} related files missing on diff`);
+
       // Send the analysis results to the analysis server
       const analysisOutput: IAnalysisOutput = {
         uuid: uuidv4(),
@@ -227,7 +257,8 @@ export default (app: Probot) => {
         owner: owner,
         pull_number: pull_number,
         data: {
-          modifiedLines: modifiedLines
+          modifiedLines: modifiedLines,
+          missingFiles: missingFiles
         },
         diff: diffOutput,
         events: jsonOutput
