@@ -175,7 +175,7 @@ export default (app: Probot) => {
       jsonOutput.forEach((dependency) => {
         dependency.body.interference.forEach((interference) => {
           // Get the path of the Java file
-          let javaFilePath = interference.location.class.replace(".", "/") + ".java";
+          let javaFilePath = interference.location.class.replace(/\./g, "/") + ".java";
           javaFilePath = searchFile(".", javaFilePath, true, context) ?? "UNKNOWN";
 
           // Set the path of the Java file
@@ -227,7 +227,7 @@ export default (app: Probot) => {
         dependency.body.interference.forEach((interference) => {
           interference.stackTrace?.forEach((node) => {
             // get the java file from the class name
-            let javaFilePath: string | null = node.class.replace(".", "/") + ".java";
+            let javaFilePath: string | null = node.class.replace(/\./g, "/") + ".java";
 
             // search for the file in the project directory
             javaFilePath = searchFile(".", javaFilePath, true, context);
@@ -321,7 +321,7 @@ async function executeAnalysis(
 function searchFile(source: string, filePath: string, recursive: boolean = false, context: Context): string | null {
   // Check if the file exists in the source directory
   const searchPath = path.join(source, filePath);
-  if (fs.existsSync(searchPath)) return searchPath;
+  if (fs.existsSync(searchPath)) return searchPath.replace(/\\/g, "/");
   if (!recursive) return null;
 
   // Get the subdirectories of the source directory
@@ -334,7 +334,7 @@ function searchFile(source: string, filePath: string, recursive: boolean = false
     // Search the file in the subdirectories
     for (let dir of dirs) {
       const result = searchFile(path.join(source, dir), filePath, true, context);
-      if (result) return result;
+      if (result) return result.replace(/\\/g, "/");
     }
   } catch (error) {
     context.log.error(`Error searching file: ${error}`);
