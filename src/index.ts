@@ -244,11 +244,20 @@ export default (app: Probot) => {
       // remove related files that are already on the diff
       startPerformance("remove_related_files_from_diff");
       const diffFiles = diffOutput.split("\n").filter((line) => line.startsWith("diff --git a/"));
-      const missingFiles = allFiles.filter((file) => {
+      const missingFilesPaths = allFiles.filter((file) => {
         return !diffFiles.some((diffFile) => diffFile.includes(file));
       });
       endPerformance("remove_related_files_from_diff");
-      context.log.info(`Found ${missingFiles.length} related files missing on diff`);
+      context.log.info(`Found ${missingFilesPaths.length} related files missing on diff`);
+
+      // get the missing files content
+      const missingFiles: { file: string; content: string }[] = [];
+      startPerformance("get_missing_files_content");
+      missingFilesPaths.forEach((file) => {
+        const fileContent = fs.readFileSync(file, "utf-8");
+        missingFiles.push({ file: file, content: fileContent });
+      });
+      endPerformance("get_missing_files_content");
 
       // Send the analysis results to the analysis server
       const analysisOutput: IAnalysisOutput = {
