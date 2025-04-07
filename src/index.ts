@@ -77,7 +77,14 @@ export default (app: Probot) => {
     let PR = await getPR();
 
     //=================== Not valid if the PR is closed or not mergeable
-    if (!PR.data.mergeable) return context.log.warn(`PR ${pull_number} from ${repo} is not open or not mergeable`);
+    let mergeable = PR.data.mergeable;
+    for (let i = 0; !mergeable && i < 5; i++) {
+      context.log.info("Waiting for mergeable status...");
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      PR = await getPR();
+      mergeable = PR.data.mergeable;
+    }
+    if (!mergeable) return context.log.warn(`PR ${pull_number} from ${repo} is not open or not mergeable`);
 
     // Get the merge commit sha (awaits until the merge commit is created)
     startPerformance("wait_merge_commit");
