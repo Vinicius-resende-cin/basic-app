@@ -232,7 +232,7 @@ export default (app: Probot) => {
             // search for the file in the project directory
             javaFilePath = searchFile(".", javaFilePath, true, context);
 
-            if (javaFilePath) {
+            if (javaFilePath && !allFiles.includes(javaFilePath)) {
               // add the file to the list of files
               allFiles.push(javaFilePath);
             }
