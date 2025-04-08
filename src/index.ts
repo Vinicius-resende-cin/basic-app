@@ -77,7 +77,14 @@ export default (app: Probot) => {
     let PR = await getPR();
 
     //=================== Not valid if the PR is closed or not mergeable
-    if (!PR.data.mergeable) return context.log.warn(`PR ${pull_number} from ${repo} is not open or not mergeable`);
+    let mergeable = PR.data.mergeable;
+    for (let i = 0; !mergeable && i < 5; i++) {
+      context.log.info("Waiting for mergeable status...");
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      PR = await getPR();
+      mergeable = PR.data.mergeable;
+    }
+    if (!mergeable) return context.log.warn(`PR ${pull_number} from ${repo} is not open or not mergeable`);
 
     // Get the merge commit sha (awaits until the merge commit is created)
     startPerformance("wait_merge_commit");
@@ -175,7 +182,7 @@ export default (app: Probot) => {
       jsonOutput.forEach((dependency) => {
         dependency.body.interference.forEach((interference) => {
           // Get the path of the Java file
-          let javaFilePath = interference.location.class.replace(".", "/") + ".java";
+          let javaFilePath = interference.location.class.replace(/\./g, "/") + ".java";
           javaFilePath = searchFile(".", javaFilePath, true, context) ?? "UNKNOWN";
 
           // Set the path of the Java file
@@ -220,6 +227,45 @@ export default (app: Probot) => {
       }
       endPerformance("get_modified_lines");
 
+      // search for all related files for each conflict
+      let allFiles: string[] = [];
+      startPerformance("search_related_files");
+      jsonOutput.forEach((dependency) => {
+        dependency.body.interference.forEach((interference) => {
+          interference.stackTrace?.forEach((node) => {
+            // get the java file from the class name
+            let javaFilePath: string | null = node.class.replace(/\./g, "/") + ".java";
+
+            // search for the file in the project directory
+            javaFilePath = searchFile(".", javaFilePath, true, context);
+
+            if (javaFilePath && !allFiles.includes(javaFilePath)) {
+              // add the file to the list of files
+              allFiles.push(javaFilePath);
+            }
+          });
+        });
+      });
+      endPerformance("search_related_files");
+
+      // remove related files that are already on the diff
+      startPerformance("remove_related_files_from_diff");
+      const diffFiles = diffOutput.split("\n").filter((line) => line.startsWith("diff --git a/"));
+      const missingFilesPaths = allFiles.filter((file) => {
+        return !diffFiles.some((diffFile) => diffFile.includes(file));
+      });
+      endPerformance("remove_related_files_from_diff");
+      context.log.info(`Found ${missingFilesPaths.length} related files missing on diff`);
+
+      // get the missing files content
+      const missingFiles: { file: string; content: string }[] = [];
+      startPerformance("get_missing_files_content");
+      missingFilesPaths.forEach((file) => {
+        const fileContent = fs.readFileSync(file, "utf-8");
+        missingFiles.push({ file: file, content: fileContent });
+      });
+      endPerformance("get_missing_files_content");
+
       // Send the analysis results to the analysis server
       const analysisOutput: IAnalysisOutput = {
         uuid: uuidv4(),
@@ -227,7 +273,8 @@ export default (app: Probot) => {
         owner: owner,
         pull_number: pull_number,
         data: {
-          modifiedLines: modifiedLines
+          modifiedLines: modifiedLines,
+          missingFiles: missingFiles
         },
         diff: diffOutput,
         events: jsonOutput
@@ -290,7 +337,7 @@ async function executeAnalysis(
 function searchFile(source: string, filePath: string, recursive: boolean = false, context: Context): string | null {
   // Check if the file exists in the source directory
   const searchPath = path.join(source, filePath);
-  if (fs.existsSync(searchPath)) return searchPath;
+  if (fs.existsSync(searchPath)) return searchPath.replace(/\\/g, "/");
   if (!recursive) return null;
 
   // Get the subdirectories of the source directory
@@ -303,7 +350,7 @@ function searchFile(source: string, filePath: string, recursive: boolean = false
     // Search the file in the subdirectories
     for (let dir of dirs) {
       const result = searchFile(path.join(source, dir), filePath, true, context);
-      if (result) return result;
+      if (result) return result.replace(/\\/g, "/");
     }
   } catch (error) {
     context.log.error(`Error searching file: ${error}`);
